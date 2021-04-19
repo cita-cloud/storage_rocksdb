@@ -1,0 +1,35 @@
+[package]
+name = "storage"
+version = "0.1.0"
+authors = ["Rivtower Technologies <contact@rivtower.com>"]
+license = "Apache-2.0"
+edition = "2018"
+
+[dependencies]
+log = "*"
+log4rs = { version = "*", features = ["default", "gzip"] }
+clap = "3.0.0-beta.2"
+git-version = "*"
+tonic = "*"
+prost = "*"
+tokio = { version = "*", features = ["full"] }
+cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto" }
+rocksdb = "*"
+hex = "*"
+
+[[bin]]
+name = "bench"
+path = "benches/main.rs"
+
+[dev-dependencies]
+tempfile = "*"
+quickcheck = "*"
+
+[profile.release.package."*"]
+# Set the default for dependencies.
+debug = 0
+
+[profile.release]
+# Add debug info -- line tables only
+debug = 1
+
