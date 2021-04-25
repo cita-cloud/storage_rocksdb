@@ -73,14 +73,16 @@ fn main() {
     }
 }
 
+use cita_cloud_proto::common::SimpleResponse;
+use cita_cloud_proto::storage::{
+    storage_service_server::StorageService, storage_service_server::StorageServiceServer, Content,
+    ExtKey, Regions, Value,
+};
 use std::path::Path;
 use tokio::fs;
+use tonic::{transport::Server, Request, Response, Status};
 
 async fn get_tx(tx_hash: &[u8]) -> Option<Vec<u8>> {
-    if tx_hash.len() != 32 {
-        warn!("len of tx_hash is not correct");
-        return None;
-    }
     let filename = hex::encode(tx_hash);
     let root_path = Path::new(".");
     let tx_path = root_path.join("txs").join(filename);
@@ -88,12 +90,24 @@ async fn get_tx(tx_hash: &[u8]) -> Option<Vec<u8>> {
     fs::read(tx_path).await.ok()
 }
 
-use cita_cloud_proto::common::SimpleResponse;
-use cita_cloud_proto::storage::{
-    storage_service_server::StorageService, storage_service_server::StorageServiceServer, Content,
-    ExtKey, Value,
-};
-use tonic::{transport::Server, Request, Response, Status};
+pub fn check_region(region: u32) -> bool {
+    region < Regions::Button as u8 as u32
+}
+
+pub fn check_key(region: u32, key: &[u8]) -> bool {
+    match region {
+        1 | 7 | 8 | 9 => key.len() == 32,
+        _ => key.len() == 8,
+    }
+}
+
+pub fn check_value(region: u32, value: &[u8]) -> bool {
+    match region {
+        4 | 6 => value.len() == 32,
+        7 | 8 => value.len() == 8,
+        _ => true,
+    }
+}
 
 use db::DB;
 
@@ -117,14 +131,21 @@ impl StorageService for StorageServer {
         let key = content.key;
         let value = content.value;
 
-        let ret = self.db.store(region, key, value);
-        if ret.is_err() {
-            warn!("store error: {:?}", ret);
-            Err(Status::aborted("db store failed"))
-        } else {
-            let reply = SimpleResponse { is_success: true };
-            Ok(Response::new(reply))
+        if !check_region(region) {
+            return Err(Status::invalid_argument("invalid region"));
         }
+
+        if !check_key(region, &key) {
+            return Err(Status::invalid_argument("invalid key"));
+        }
+
+        if !check_value(region, &value) {
+            return Err(Status::invalid_argument("invalid value"));
+        }
+
+        self.db
+            .store(region, key, value)
+            .map(|_| Response::new(SimpleResponse { is_success: true }))
     }
 
     async fn load(&self, request: Request<ExtKey>) -> Result<Response<Value>, Status> {
@@ -134,18 +155,23 @@ impl StorageService for StorageServer {
         let region = ext_key.region;
         let key = ext_key.key;
 
+        if !check_region(region) {
+            return Err(Status::invalid_argument("invalid region"));
+        }
+
+        if !check_key(region, &key) {
+            return Err(Status::invalid_argument("invalid key"));
+        }
+
         let ret = if region == 1 {
-            get_tx(&key).await.ok_or_else(|| "get tx failed".to_owned())
+            get_tx(&key)
+                .await
+                .ok_or_else(|| Status::aborted("get tx failed"))
         } else {
             self.db.load(region, key)
         };
-        if let Ok(value) = ret {
-            let reply = Value { value };
-            Ok(Response::new(reply))
-        } else {
-            warn!("load error: {:?}", ret);
-            Err(Status::aborted("db load failed"))
-        }
+
+        ret.map(|value| Response::new(Value { value }))
     }
 
     async fn delete(&self, request: Request<ExtKey>) -> Result<Response<SimpleResponse>, Status> {
@@ -154,6 +180,14 @@ impl StorageService for StorageServer {
         let ext_key = request.into_inner();
         let region = ext_key.region;
         let key = ext_key.key;
+
+        if !check_region(region) {
+            return Err(Status::invalid_argument("invalid region"));
+        }
+
+        if !check_key(region, &key) {
+            return Err(Status::invalid_argument("invalid key"));
+        }
 
         let ret = self.db.delete(region, key);
         if ret.is_err() {

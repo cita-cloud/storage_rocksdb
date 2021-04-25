@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use cita_cloud_proto::storage::Regions;
 use rocksdb::DB as RocksDB;
 use rocksdb::{ColumnFamilyDescriptor, Options};
 use std::path::Path;
 use std::vec::Vec;
-
+use tonic::Status;
 
 pub struct DB {
     db: RocksDB,
@@ -28,44 +29,53 @@ impl DB {
         let path = root_path.join(db_path);
 
         let mut cfs = Vec::new();
-        for i in 0..10 {
+        for i in 0..Regions::Button as u8 {
             let mut cf_opts = Options::default();
             cf_opts.set_max_write_buffer_number(16);
             let cf = ColumnFamilyDescriptor::new(format!("{}", i), cf_opts);
             cfs.push(cf);
-        }        
+        }
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
         db_opts.create_if_missing(true);
-        
+
         let db = RocksDB::open_cf_descriptors(&db_opts, path, cfs).unwrap();
-        
+
         DB { db }
     }
 
-    pub fn store(&self, region: u32, key: Vec<u8>, value: Vec<u8>) -> Result<(), String> {
+    pub fn store(&self, region: u32, key: Vec<u8>, value: Vec<u8>) -> Result<(), Status> {
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
             let ret = self.db.put_cf(cf, key, value);
-            return ret.map_err(|e| format!("store error: {:?}", e));
+            ret.map_err(|e| Status::aborted(format!("store error: {:?}", e)))
+        } else {
+            Err(Status::aborted("bad region"))
         }
-        Err("bad region!".to_owned())
     }
 
-    pub fn load(&self, region: u32, key: Vec<u8>) -> Result<Vec<u8>, String> {
+    pub fn load(&self, region: u32, key: Vec<u8>) -> Result<Vec<u8>, Status> {
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
             let ret = self.db.get_cf(cf, key);
-            return ret.map_err(|e| format!("store error: {:?}", e)).map(|v| v.unwrap_or(vec![]));
+            match ret {
+                Ok(opt_v) => match opt_v {
+                    Some(v) => Ok(v),
+                    None => Err(Status::not_found("key not found")),
+                },
+                Err(e) => Err(Status::aborted(format!("store error: {:?}", e))),
+            }
+        } else {
+            Err(Status::aborted("bad region"))
         }
-        Err("bad region!".to_owned())
     }
 
-    pub fn delete(&self, region: u32, key: Vec<u8>) -> Result<(), String> {
+    pub fn delete(&self, region: u32, key: Vec<u8>) -> Result<(), Status> {
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
             let ret = self.db.delete_cf(cf, key);
-            return ret.map_err(|e| format!("store error: {:?}", e));
+            ret.map_err(|e| Status::aborted(format!("store error: {:?}", e)))
+        } else {
+            Err(Status::aborted("bad region"))
         }
-        Err("bad region!".to_owned())
     }
 }
 
