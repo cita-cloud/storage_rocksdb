@@ -77,10 +77,8 @@ fn main() {
 use cita_cloud_proto::common::SimpleResponse;
 use cita_cloud_proto::storage::{
     storage_service_server::StorageService, storage_service_server::StorageServiceServer, Content,
-    ExtKey, Regions, Value,
+    ExtKey, Value,
 };
-use std::path::Path;
-use tokio::fs;
 use tonic::{transport::Server, Request, Response, Status};
 
 use db::DB;

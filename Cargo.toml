@@ -24,6 +24,11 @@ path = "benches/main.rs"
 [dev-dependencies]
 tempfile = "*"
 quickcheck = "*"
+rand = "0.8"
+libsm = "0.4"
+minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
+minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
+minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
 
 [profile.release.package."*"]
 # Set the default for dependencies.

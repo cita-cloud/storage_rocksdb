@@ -16,6 +16,9 @@ use cita_cloud_proto::{
     blockchain::{raw_transaction::Tx, Block, CompactBlock, CompactBlockBody, RawTransaction},
     storage::Regions,
 };
+use cita_cloud_proto::blockchain::BlockHeader;
+use tonic::Status;
+use prost::Message;
 
 pub fn check_region(region: u32) -> bool {
     region < Regions::Button as u8 as u32
@@ -23,7 +26,7 @@ pub fn check_region(region: u32) -> bool {
 
 pub fn check_key(region: u32, key: &[u8]) -> bool {
     match region {
-        1 | 7 | 8 | 9 | 10 | 11 => key.len() == 32,
+        1 | 7 | 8 | 9 => key.len() == 32,
         _ => key.len() == 8,
     }
 }
@@ -63,5 +66,24 @@ pub fn full_to_compact(block: Block) -> CompactBlock {
         version: block.version,
         header: block.header,
         body: Some(compact_body),
+    }
+}
+
+pub fn hash_data(data: &[u8]) -> Vec<u8> {
+    libsm::sm3::hash::Sm3Hash::new(data).get_hash().to_vec()
+}
+
+pub fn get_block_hash(header: Option<&BlockHeader>) -> Result<Vec<u8>, Status> {
+    match header {
+        Some(header) => {
+            let mut block_header_bytes = Vec::new();
+            header
+                .encode(&mut block_header_bytes)
+                .map_err(|_| Status::invalid_argument("encode block header failed"))?;
+            let block_hash = hash_data(&block_header_bytes);
+            Ok(block_hash)
+        }
+
+        None => return Err(Status::invalid_argument("no blockheader")),
     }
 }
