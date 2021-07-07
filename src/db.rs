@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::util::{check_key, check_region, check_value, full_to_compact, get_tx_hash, hash_data, get_block_hash};
+use crate::util::{
+    check_key, check_region, check_value, full_to_compact, get_block_hash, get_tx_hash, hash_data,
+};
 use cita_cloud_proto::{
     blockchain::{Block, CompactBlock, RawTransaction, RawTransactions},
     storage::Regions,
@@ -205,16 +207,16 @@ mod tests {
     use cita_cloud_proto::blockchain::{
         raw_transaction::Tx, BlockHeader, Transaction, UnverifiedTransaction, Witness,
     };
+    use minitrace::*;
+    use minitrace_jaeger::Reporter;
+    use minitrace_macro::trace;
     use quickcheck::quickcheck;
     use quickcheck::Arbitrary;
     use quickcheck::Gen;
     use rand::{thread_rng, Rng};
-    use tempfile::tempdir;
-    use std::time::Instant;
-    use minitrace::*;
-    use minitrace_macro::trace;
-    use minitrace_jaeger::Reporter;
     use std::net::SocketAddr;
+    use std::time::Instant;
+    use tempfile::tempdir;
 
     #[derive(Clone, Debug)]
     struct DBTestArgs {
@@ -331,7 +333,7 @@ mod tests {
     fn create_full_block(tx_num: u64, height: u64) -> (Vec<u8>, Vec<u8>) {
         let default_proof = vec![0; 128];
         let mut rng = thread_rng();
-        let mut body= Vec::new();
+        let mut body = Vec::new();
 
         for _ in 0..tx_num {
             let to: [u8; 20] = rng.gen();
@@ -376,7 +378,8 @@ mod tests {
 
         let (block_hash, block_bytes) = create_full_block(6000, h);
 
-        db.store_full_block(block_hash.clone(), block_bytes.clone()).unwrap();
+        db.store_full_block(block_hash.clone(), block_bytes.clone())
+            .unwrap();
         let load_bytes = db.load_full_block(block_hash).unwrap();
 
         assert_eq!(block_bytes, load_bytes)
@@ -404,7 +407,8 @@ mod tests {
             }
 
             collector
-        }.collect();
+        }
+        .collect();
 
         // Report to Jaeger
         let socket = SocketAddr::new("127.0.0.1".parse().unwrap(), 6831);
@@ -419,7 +423,7 @@ mod tests {
             SPAN_ID_PREFIX,
             &spans,
         )
-            .expect("encode error");
+        .expect("encode error");
         Reporter::report(socket, &bytes).expect("report error");
 
         println!("{:?}", now.elapsed());

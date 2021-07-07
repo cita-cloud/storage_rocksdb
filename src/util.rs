@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use cita_cloud_proto::blockchain::BlockHeader;
 use cita_cloud_proto::{
     blockchain::{raw_transaction::Tx, Block, CompactBlock, CompactBlockBody, RawTransaction},
     storage::Regions,
 };
-use cita_cloud_proto::blockchain::BlockHeader;
-use tonic::Status;
 use prost::Message;
+use tonic::Status;
 
 pub fn check_region(region: u32) -> bool {
     region < Regions::Button as u8 as u32
