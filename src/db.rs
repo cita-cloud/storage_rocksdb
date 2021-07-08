@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::util::{
-    check_key, check_region, check_value, full_to_compact, get_block_hash, get_tx_hash, hash_data,
+    check_key, check_region, check_value, full_to_compact, get_block_hash, get_tx_hash,
 };
 use cita_cloud_proto::{
     blockchain::{Block, CompactBlock, RawTransaction, RawTransactions},

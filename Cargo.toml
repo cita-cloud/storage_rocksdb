@@ -16,6 +16,7 @@ tokio = { version = "*", features = ["full"] }
 cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto", branch = "full_block_store_dev" }
 rocksdb = "*"
 hex = "*"
+libsm = "0.4"
 
 [[bin]]
 name = "bench"
@@ -25,7 +26,6 @@ path = "benches/main.rs"
 tempfile = "*"
 quickcheck = "*"
 rand = "0.8"
-libsm = "0.4"
 minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
