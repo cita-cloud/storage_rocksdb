@@ -103,7 +103,7 @@ impl StorageService for StorageServer {
         let key = content.key;
         let value = content.value;
 
-        if region == 10 {
+        if region == 11 {
             self.db
                 .store_full_block(key, value)
                 .map(|_| Response::new(SimpleResponse { is_success: true }))
@@ -121,7 +121,7 @@ impl StorageService for StorageServer {
         let region = ext_key.region;
         let key = ext_key.key;
 
-        if region == 10 {
+        if region == 11 {
             self.db
                 .load_full_block(key)
                 .map(|value| Response::new(Value { value }))

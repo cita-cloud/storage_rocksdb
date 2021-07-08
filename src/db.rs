@@ -118,7 +118,7 @@ impl DB {
         height_bytes: Vec<u8>,
         block_bytes: Vec<u8>,
     ) -> Result<(), Status> {
-        if !check_key(10, &height_bytes) {
+        if !check_key(11, &height_bytes) {
             return Err(Status::invalid_argument("invalid key"));
         }
 
