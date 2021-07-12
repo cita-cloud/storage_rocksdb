@@ -1,6 +1,6 @@
 [package]
 name = "storage"
-version = "0.1.0"
+version = "6.0.0"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 license = "Apache-2.0"
 edition = "2018"
@@ -13,9 +13,10 @@ git-version = "*"
 tonic = "*"
 prost = "*"
 tokio = { version = "*", features = ["full"] }
-cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto" }
+cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto", branch = "full_block_store_dev" }
 rocksdb = "*"
 hex = "*"
+libsm = "0.4"
 
 [[bin]]
 name = "bench"
@@ -24,6 +25,10 @@ path = "benches/main.rs"
 [dev-dependencies]
 tempfile = "*"
 quickcheck = "*"
+rand = "0.8"
+minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
+minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
+minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
 
 [profile.release.package."*"]
 # Set the default for dependencies.
