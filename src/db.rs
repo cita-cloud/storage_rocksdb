@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::util::{
-    check_key, check_region, check_value, full_to_compact, get_block_hash, get_tx_hash,
-};
+use crate::util::{check_key, check_region, check_value, full_to_compact, kms_client};
 use cita_cloud_proto::{
     blockchain::{Block, CompactBlock, RawTransaction, RawTransactions},
     storage::Regions,
 };
+use cloud_util::common::get_tx_hash;
+use cloud_util::crypto::get_block_hash;
 use prost::Message;
 use rocksdb::DB as RocksDB;
 use rocksdb::{ColumnFamilyDescriptor, Options};
+use status_code::StatusCode;
 use std::path::Path;
 use std::vec::Vec;
-use tonic::Status;
 
 pub struct DB {
     db: RocksDB,
@@ -52,96 +52,108 @@ impl DB {
         DB { db }
     }
 
-    pub fn store(&self, region: u32, key: Vec<u8>, value: Vec<u8>) -> Result<(), Status> {
+    pub fn store(&self, region: u32, key: Vec<u8>, value: Vec<u8>) -> Result<(), StatusCode> {
         if !check_region(region) {
-            return Err(Status::invalid_argument("invalid region"));
+            return Err(StatusCode::InvalidRegion);
         }
 
         if !check_key(region, &key) {
-            return Err(Status::invalid_argument("invalid key"));
+            return Err(StatusCode::InvalidKey);
         }
 
         if !check_value(region, &value) {
-            return Err(Status::invalid_argument("invalid value"));
+            return Err(StatusCode::InvalidValue);
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
-            let ret = self.db.put_cf(cf, key, value);
-            ret.map_err(|e| Status::aborted(format!("store error: {:?}", e)))
+            self.db.put_cf(cf, key, value).map_err(|e| {
+                log::warn!("store error: {:?}", e);
+                StatusCode::StoreError
+            })
         } else {
-            Err(Status::aborted("bad region"))
+            log::warn!("store: bad region({})", region);
+            Err(StatusCode::BadRegion)
         }
     }
 
-    pub fn load(&self, region: u32, key: Vec<u8>) -> Result<Vec<u8>, Status> {
+    pub fn load(&self, region: u32, key: Vec<u8>) -> Result<Vec<u8>, StatusCode> {
         if !check_region(region) {
-            return Err(Status::invalid_argument("invalid region"));
+            return Err(StatusCode::InvalidRegion);
         }
 
         if !check_key(region, &key) {
-            return Err(Status::invalid_argument("invalid key"));
+            return Err(StatusCode::InvalidKey);
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
-            let ret = self.db.get_cf(cf, key);
-            match ret {
-                Ok(opt_v) => match opt_v {
-                    Some(v) => Ok(v),
-                    None => Err(Status::not_found("key not found")),
-                },
-                Err(e) => Err(Status::aborted(format!("store error: {:?}", e))),
+            match self.db.get_cf(cf, &key) {
+                Ok(Some(v)) => Ok(v),
+                Ok(None) => {
+                    log::warn!("load: key({}) not found", hex::encode(&key));
+                    Err(StatusCode::NotFound)
+                }
+                Err(e) => {
+                    log::warn!("load error: {:?}", e);
+                    Err(StatusCode::LoadError)
+                }
             }
         } else {
-            Err(Status::aborted("bad region"))
+            log::warn!("load: bad region({})", region);
+            Err(StatusCode::BadRegion)
         }
     }
 
-    pub fn delete(&self, region: u32, key: Vec<u8>) -> Result<(), Status> {
+    pub fn delete(&self, region: u32, key: Vec<u8>) -> Result<(), StatusCode> {
         if !check_region(region) {
-            return Err(Status::invalid_argument("invalid region"));
+            return Err(StatusCode::InvalidRegion);
         }
 
         if !check_key(region, &key) {
-            return Err(Status::invalid_argument("invalid key"));
+            return Err(StatusCode::InvalidKey);
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
-            let ret = self.db.delete_cf(cf, key);
-            ret.map_err(|e| Status::aborted(format!("store error: {:?}", e)))
+            self.db.delete_cf(cf, key).map_err(|e| {
+                log::warn!("delete error: {:?}", e);
+                StatusCode::DeleteError
+            })
         } else {
-            Err(Status::aborted("bad region"))
+            log::warn!("delete: bad region({})", region);
+            Err(StatusCode::BadRegion)
         }
     }
 
-    pub fn store_full_block(
+    pub async fn store_full_block(
         &self,
         height_bytes: Vec<u8>,
         block_bytes: Vec<u8>,
-    ) -> Result<(), Status> {
+    ) -> Result<(), StatusCode> {
         if !check_key(11, &height_bytes) {
-            return Err(Status::invalid_argument("invalid key"));
+            return Err(StatusCode::InvalidKey);
         }
 
-        let block = Block::decode(block_bytes.as_slice())
-            .map_err(|_| Status::invalid_argument("decode Block failed"))?;
+        let block = Block::decode(block_bytes.as_slice()).map_err(|_| {
+            log::warn!("store_full_block: decode Block failed");
+            StatusCode::DecodeError
+        })?;
 
-        let block_hash = get_block_hash(block.header.as_ref())?;
+        let block_hash = get_block_hash(kms_client(), block.header.as_ref()).await?;
 
         for (tx_index, raw_tx) in block
             .body
             .clone()
-            .ok_or(Status::invalid_argument("block body not found"))?
+            .ok_or(StatusCode::NoneBlockBody)?
             .body
             .into_iter()
             .enumerate()
         {
             let mut tx_bytes = Vec::new();
-            raw_tx
-                .encode(&mut tx_bytes)
-                .map_err(|_| Status::invalid_argument("encode RawTransaction failed"))?;
+            raw_tx.encode(&mut tx_bytes).map_err(|_| {
+                log::warn!("store_full_block: encode RawTransaction failed");
+                StatusCode::EncodeError
+            })?;
 
-            let tx_hash =
-                get_tx_hash(&raw_tx).ok_or(Status::invalid_argument("can not get tx hash"))?;
+            let tx_hash = get_tx_hash(&raw_tx)?.to_vec();
             self.store(1, tx_hash.clone(), tx_bytes)?;
             self.store(7, tx_hash.clone(), height_bytes.clone())?;
             self.store(9, tx_hash, tx_index.to_be_bytes().to_vec())?;
@@ -155,24 +167,30 @@ impl DB {
         let mut compact_block_bytes = Vec::new();
         compact_block
             .encode(&mut compact_block_bytes)
-            .map_err(|_| Status::invalid_argument("encode CompactBlock failed"))?;
+            .map_err(|_| {
+                log::warn!("store_full_block: encode CompactBlock failed");
+                StatusCode::EncodeError
+            })?;
         self.store(10, height_bytes, compact_block_bytes)?;
 
         Ok(())
     }
 
-    pub fn load_full_block(&self, height_bytes: Vec<u8>) -> Result<Vec<u8>, Status> {
+    pub fn load_full_block(&self, height_bytes: Vec<u8>) -> Result<Vec<u8>, StatusCode> {
         let compact_block_bytes = self.load(10, height_bytes.clone())?;
-        let compact_block = CompactBlock::decode(compact_block_bytes.as_slice())
-            .map_err(|_| Status::invalid_argument("decode CompactBlock failed"))?;
+        let compact_block = CompactBlock::decode(compact_block_bytes.as_slice()).map_err(|_| {
+            log::warn!("load_full_block: decode CompactBlock failed");
+            StatusCode::EncodeError
+        })?;
 
         let proof = self.load(5, height_bytes)?;
         let block = self.get_full_block(compact_block, proof)?;
 
         let mut block_bytes = Vec::new();
-        block
-            .encode(&mut block_bytes)
-            .map_err(|_| Status::invalid_argument("encode Block failed"))?;
+        block.encode(&mut block_bytes).map_err(|_| {
+            log::warn!("load_full_block: encode Block failed");
+            StatusCode::EncodeError
+        })?;
 
         Ok(block_bytes)
     }
@@ -181,13 +199,15 @@ impl DB {
         &self,
         compact_block: CompactBlock,
         proof: Vec<u8>,
-    ) -> Result<Block, Status> {
+    ) -> Result<Block, StatusCode> {
         let mut body = Vec::new();
         if let Some(compact_body) = compact_block.body {
             for tx_hash in compact_body.tx_hashes {
                 let tx_bytes = self.load(1, tx_hash)?;
-                let raw_tx = RawTransaction::decode(tx_bytes.as_slice())
-                    .map_err(|_| Status::invalid_argument("decode RawTransaction failed"))?;
+                let raw_tx = RawTransaction::decode(tx_bytes.as_slice()).map_err(|_| {
+                    log::warn!("get_full_block: decode RawTransaction failed");
+                    StatusCode::DecodeError
+                })?;
                 body.push(raw_tx)
             }
         }
@@ -207,6 +227,7 @@ mod tests {
     use cita_cloud_proto::blockchain::{
         raw_transaction::Tx, BlockHeader, Transaction, UnverifiedTransaction, Witness,
     };
+    use cloud_util::crypto::hash_data;
     use minitrace::*;
     use minitrace_jaeger::Reporter;
     use minitrace_macro::trace;
@@ -305,7 +326,7 @@ mod tests {
                 tx.encode(&mut buf).unwrap();
                 buf
             };
-            hash_data(tx_bytes.as_slice())
+            hash_data(kms_client(), tx_bytes.as_slice())
         };
 
         // build raw tx

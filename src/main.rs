@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod config;
 mod db;
 mod util;
 
@@ -69,19 +70,20 @@ fn main() {
             log4rs::init_file("storage-log4rs.yaml", Default::default()).unwrap();
             info!("grpc port of this service: {}", opts.grpc_port);
             info!("db path of this service: {}", opts.db_path);
-            let _ = run(opts);
+            let fin = run(opts);
+            warn!("Should not reach here {:?}", fin);
         }
     }
 }
 
-use cita_cloud_proto::common::SimpleResponse;
 use cita_cloud_proto::storage::{
     storage_service_server::StorageService, storage_service_server::StorageServiceServer, Content,
     ExtKey, Value,
 };
-use tonic::{transport::Server, Request, Response, Status};
-
 use db::DB;
+use status_code::StatusCode;
+use std::net::AddrParseError;
+use tonic::{transport::Server, Request, Response, Status};
 
 pub struct StorageServer {
     db: DB,
@@ -95,7 +97,10 @@ impl StorageServer {
 
 #[tonic::async_trait]
 impl StorageService for StorageServer {
-    async fn store(&self, request: Request<Content>) -> Result<Response<SimpleResponse>, Status> {
+    async fn store(
+        &self,
+        request: Request<Content>,
+    ) -> Result<Response<cita_cloud_proto::common::StatusCode>, Status> {
         debug!("store request: {:?}", request);
 
         let content = request.into_inner();
@@ -104,13 +109,21 @@ impl StorageService for StorageServer {
         let value = content.value;
 
         if region == 11 {
-            self.db
-                .store_full_block(key, value)
-                .map(|_| Response::new(SimpleResponse { is_success: true }))
+            match self.db.store_full_block(key, value).await {
+                Ok(()) => Ok(Response::new(StatusCode::Success.into())),
+                Err(status) => {
+                    warn!("store_full_block failed: {}", status.to_string());
+                    Ok(Response::new(status.into()))
+                }
+            }
         } else {
-            self.db
-                .store(region, key, value)
-                .map(|_| Response::new(SimpleResponse { is_success: true }))
+            match self.db.store(region, key, value) {
+                Ok(()) => Ok(Response::new(StatusCode::Success.into())),
+                Err(status) => {
+                    warn!("store failed: {}", status.to_string());
+                    Ok(Response::new(status.into()))
+                }
+            }
         }
     }
 
@@ -122,39 +135,63 @@ impl StorageService for StorageServer {
         let key = ext_key.key;
 
         if region == 11 {
-            self.db
-                .load_full_block(key)
-                .map(|value| Response::new(Value { value }))
+            match self.db.load_full_block(key) {
+                Ok(value) => Ok(Response::new(Value {
+                    status: Some(StatusCode::Success.into()),
+                    value,
+                })),
+                Err(status) => {
+                    warn!("load_full_block failed: {}", status.to_string());
+                    Ok(Response::new(Value {
+                        status: Some(status.into()),
+                        value: vec![],
+                    }))
+                }
+            }
         } else {
-            self.db
-                .load(region, key)
-                .map(|value| Response::new(Value { value }))
+            match self.db.load(region, key) {
+                Ok(value) => Ok(Response::new(Value {
+                    status: Some(StatusCode::Success.into()),
+                    value,
+                })),
+                Err(status) => {
+                    warn!("load failed: {}", status.to_string());
+                    Ok(Response::new(Value {
+                        status: Some(status.into()),
+                        value: vec![],
+                    }))
+                }
+            }
         }
     }
 
-    // todo full block delete
-    async fn delete(&self, request: Request<ExtKey>) -> Result<Response<SimpleResponse>, Status> {
+    async fn delete(
+        &self,
+        request: Request<ExtKey>,
+    ) -> Result<Response<cita_cloud_proto::common::StatusCode>, Status> {
         debug!("delete request: {:?}", request);
 
         let ext_key = request.into_inner();
         let region = ext_key.region;
         let key = ext_key.key;
 
-        let ret = self.db.delete(region, key);
-        if ret.is_err() {
-            warn!("delete error: {:?}", ret);
-            Err(Status::aborted("db delete failed"))
-        } else {
-            let reply = SimpleResponse { is_success: true };
-            Ok(Response::new(reply))
+        match self.db.delete(region, key) {
+            Ok(()) => Ok(Response::new(StatusCode::Success.into())),
+            Err(status) => {
+                warn!("delete error: {}", status.to_string());
+                Ok(Response::new(status.into()))
+            }
         }
     }
 }
 
 #[tokio::main]
-async fn run(opts: RunOpts) -> Result<(), Box<dyn std::error::Error>> {
+async fn run(opts: RunOpts) -> Result<(), StatusCode> {
     let addr_str = format!("127.0.0.1:{}", opts.grpc_port);
-    let addr = addr_str.parse()?;
+    let addr = addr_str.parse().map_err(|e: AddrParseError| {
+        warn!("grpc listen addr parse failed: {} ", e.to_string());
+        StatusCode::FatalError
+    })?;
 
     // init db
     let db = DB::new(&opts.db_path);
@@ -163,7 +200,11 @@ async fn run(opts: RunOpts) -> Result<(), Box<dyn std::error::Error>> {
     Server::builder()
         .add_service(StorageServiceServer::new(storage_server))
         .serve(addr)
-        .await?;
+        .await
+        .map_err(|e| {
+            warn!("start controller grpc server failed: {} ", e.to_string());
+            StatusCode::FatalError
+        })?;
 
     Ok(())
 }
