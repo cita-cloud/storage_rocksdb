@@ -75,6 +75,8 @@ fn main() {
     }
 }
 
+use crate::config::StorageConfig;
+use crate::util::init_grpc_client;
 use cita_cloud_proto::storage::{
     storage_service_server::StorageService, storage_service_server::StorageServiceServer, Content,
     ExtKey, Value,
@@ -83,8 +85,6 @@ use db::DB;
 use status_code::StatusCode;
 use std::net::AddrParseError;
 use tonic::{transport::Server, Request, Response, Status};
-use crate::config::StorageConfig;
-use crate::util::init_grpc_client;
 
 pub struct StorageServer {
     db: DB,

@@ -416,7 +416,9 @@ mod tests {
 
         let (block_hash, block_bytes) = create_full_block(6000, h);
 
-        db.store_full_block(block_hash.clone(), block_bytes.clone()).await.unwrap();
+        db.store_full_block(block_hash.clone(), block_bytes.clone())
+            .await
+            .unwrap();
 
         let load_bytes = db.load_full_block(block_hash).unwrap();
 
@@ -441,7 +443,10 @@ mod tests {
             for _ in 0..5 {
                 let (height_bytes, block_bytes) = create_full_block(6000, h);
 
-                let _ = db.store_full_block(height_bytes, block_bytes).await.unwrap();
+                let _ = db
+                    .store_full_block(height_bytes, block_bytes)
+                    .await
+                    .unwrap();
                 h = h + 1;
             }
 

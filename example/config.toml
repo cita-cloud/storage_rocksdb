@@ -18,9 +18,9 @@ block_interval = 3
 validators = ["0x01010101", "0x02020202"]
 block_limit = 100
 
-[kms]
+[kms_sm]
 kms_port = 60005
 
-[storage]
+[storage_rocksdb]
 kms_port = 60005
 storage_port = 60003
