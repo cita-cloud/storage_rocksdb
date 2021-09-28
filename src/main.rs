@@ -51,8 +51,11 @@ struct RunOpts {
     #[clap(short = 'p', long = "port", default_value = "50003")]
     grpc_port: String,
     /// Sets db path.
-    #[clap(short = 'd', long = "db", default_value = "chain_data")]
-    db_path: String,
+    #[clap(short = 'd', long = "db")]
+    db_path: Option<String>,
+    /// Chain config path
+    #[clap(short = 'c', long = "config", default_value = "config.toml")]
+    config_path: String,
 }
 
 fn main() {
@@ -66,10 +69,6 @@ fn main() {
             println!("homepage: {}", GIT_HOMEPAGE);
         }
         SubCommand::Run(opts) => {
-            // init log4rs
-            log4rs::init_file("storage-log4rs.yaml", Default::default()).unwrap();
-            info!("grpc port of this service: {}", opts.grpc_port);
-            info!("db path of this service: {}", opts.db_path);
             let fin = run(opts);
             warn!("Should not reach here {:?}", fin);
         }
@@ -84,6 +83,8 @@ use db::DB;
 use status_code::StatusCode;
 use std::net::AddrParseError;
 use tonic::{transport::Server, Request, Response, Status};
+use crate::config::StorageConfig;
+use crate::util::init_grpc_client;
 
 pub struct StorageServer {
     db: DB,
@@ -187,14 +188,36 @@ impl StorageService for StorageServer {
 
 #[tokio::main]
 async fn run(opts: RunOpts) -> Result<(), StatusCode> {
-    let addr_str = format!("127.0.0.1:{}", opts.grpc_port);
+    let config = StorageConfig::new(&opts.config_path);
+    init_grpc_client(&config);
+    // init log4rs
+    log4rs::init_file(&config.log_file, Default::default()).unwrap();
+
+    let grpc_port = {
+        if "50003" != opts.grpc_port {
+            opts.grpc_port.clone()
+        } else if config.storage_port != 50003 {
+            config.storage_port.to_string()
+        } else {
+            "50003".to_string()
+        }
+    };
+    info!("grpc port of this service: {}", grpc_port);
+
+    let db_path = match opts.db_path {
+        Some(path) => path,
+        None => config.db_path,
+    };
+    info!("db path of this service: {}", &db_path);
+
+    let addr_str = format!("127.0.0.1:{}", grpc_port);
     let addr = addr_str.parse().map_err(|e: AddrParseError| {
         warn!("grpc listen addr parse failed: {} ", e.to_string());
         StatusCode::FatalError
     })?;
 
     // init db
-    let db = DB::new(&opts.db_path);
+    let db = DB::new(&db_path);
     let storage_server = StorageServer::new(db);
 
     Server::builder()

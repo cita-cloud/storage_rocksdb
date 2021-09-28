@@ -224,18 +224,24 @@ impl DB {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "kms")]
     use cita_cloud_proto::blockchain::{
         raw_transaction::Tx, BlockHeader, Transaction, UnverifiedTransaction, Witness,
     };
-    use cloud_util::crypto::hash_data;
+    #[cfg(feature = "kms")]
     use minitrace::*;
+    #[cfg(feature = "kms")]
     use minitrace_jaeger::Reporter;
+    #[cfg(feature = "kms")]
     use minitrace_macro::trace;
     use quickcheck::quickcheck;
     use quickcheck::Arbitrary;
     use quickcheck::Gen;
+    #[cfg(feature = "kms")]
     use rand::{thread_rng, Rng};
+    #[cfg(feature = "kms")]
     use std::net::SocketAddr;
+    #[cfg(feature = "kms")]
     use std::time::Instant;
     use tempfile::tempdir;
 
@@ -302,6 +308,7 @@ mod tests {
          }
     }
 
+    #[cfg(feature = "kms")]
     fn build_normal_tx(to: Vec<u8>, data: Vec<u8>, value: Vec<u8>) -> Transaction {
         // get start block number
         let nonce = rand::random::<u64>().to_string();
@@ -317,6 +324,14 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "kms")]
+    pub fn hash_data(data: &[u8]) -> Vec<u8> {
+        let mut result = [0u8; 32];
+        result.copy_from_slice(libsm::sm3::hash::Sm3Hash::new(data).get_hash().as_ref());
+        result.to_vec()
+    }
+
+    #[cfg(feature = "kms")]
     fn prepare_raw_tx(tx: Transaction) -> RawTransaction {
         // calc tx hash
         let tx_hash = {
@@ -326,7 +341,7 @@ mod tests {
                 tx.encode(&mut buf).unwrap();
                 buf
             };
-            hash_data(kms_client(), tx_bytes.as_slice())
+            hash_data(tx_bytes.as_slice())
         };
 
         // build raw tx
@@ -351,6 +366,7 @@ mod tests {
     }
 
     #[trace("create_full_block")]
+    #[cfg(feature = "kms")]
     fn create_full_block(tx_num: u64, height: u64) -> (Vec<u8>, Vec<u8>) {
         let default_proof = vec![0; 128];
         let mut rng = thread_rng();
@@ -390,8 +406,9 @@ mod tests {
         (height.to_be_bytes().to_vec(), block_bytes)
     }
 
-    #[test]
-    fn full_block_store_load_test() {
+    #[tokio::test]
+    #[cfg(feature = "kms")]
+    async fn full_block_store_load_test() {
         let dir = tempdir().unwrap();
         let path = dir.path().to_str().unwrap();
         let db = DB::new(path);
@@ -399,14 +416,15 @@ mod tests {
 
         let (block_hash, block_bytes) = create_full_block(6000, h);
 
-        db.store_full_block(block_hash.clone(), block_bytes.clone())
-            .unwrap();
+        db.store_full_block(block_hash.clone(), block_bytes.clone()).await.unwrap();
+
         let load_bytes = db.load_full_block(block_hash).unwrap();
 
         assert_eq!(block_bytes, load_bytes)
     }
 
-    #[test]
+    #[tokio::test]
+    #[cfg(all(feature = "kms", feature = "minitrace"))]
     fn full_block_store_bench_test() {
         let dir = tempdir().unwrap();
         let path = dir.path().to_str().unwrap();
@@ -423,7 +441,7 @@ mod tests {
             for _ in 0..5 {
                 let (height_bytes, block_bytes) = create_full_block(6000, h);
 
-                let _ = db.store_full_block(height_bytes, block_bytes);
+                let _ = db.store_full_block(height_bytes, block_bytes).await.unwrap();
                 h = h + 1;
             }
 

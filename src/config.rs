@@ -22,7 +22,7 @@ pub struct StorageConfig {
 
     pub kms_port: u16,
 
-    pub storage_path: String,
+    pub db_path: String,
 
     pub log_file: String,
 }
@@ -32,7 +32,7 @@ impl Default for StorageConfig {
         Self {
             storage_port: 50003,
             kms_port: 50005,
-            storage_path: "chain_data".to_string(),
+            db_path: "chain_data".to_string(),
             log_file: "storage-log4rs.yaml".to_string(),
         }
     }
