@@ -66,8 +66,13 @@ impl DB {
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
-            self.db.put_cf(cf, key, value).map_err(|e| {
-                log::warn!("store error: {:?}", e);
+            self.db.put_cf(cf, key.clone(), value).map_err(|e| {
+                log::warn!(
+                    "store region({}), key({}) error: {:?}",
+                    region,
+                    hex::encode(&key),
+                    e
+                );
                 StatusCode::StoreError
             })
         } else {
@@ -89,11 +94,20 @@ impl DB {
             match self.db.get_cf(cf, &key) {
                 Ok(Some(v)) => Ok(v),
                 Ok(None) => {
-                    log::warn!("load: key({}) not found", hex::encode(&key));
+                    log::warn!(
+                        "load: region({}), key({}) not found",
+                        region,
+                        hex::encode(&key)
+                    );
                     Err(StatusCode::NotFound)
                 }
                 Err(e) => {
-                    log::warn!("load error: {:?}", e);
+                    log::warn!(
+                        "load region({}), key({}) error: {:?}",
+                        region,
+                        hex::encode(&key),
+                        e
+                    );
                     Err(StatusCode::LoadError)
                 }
             }
@@ -113,8 +127,13 @@ impl DB {
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
-            self.db.delete_cf(cf, key).map_err(|e| {
-                log::warn!("delete error: {:?}", e);
+            self.db.delete_cf(cf, &key).map_err(|e| {
+                log::warn!(
+                    "delete: region({}), key({}) error: {:?}",
+                    region,
+                    hex::encode(&key),
+                    e
+                );
                 StatusCode::DeleteError
             })
         } else {
