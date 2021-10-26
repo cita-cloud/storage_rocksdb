@@ -147,6 +147,11 @@ impl DB {
         height_bytes: Vec<u8>,
         block_bytes: Vec<u8>,
     ) -> Result<(), StatusCode> {
+        let mut height_array = [0; 8];
+        height_array.copy_from_slice(&height_bytes);
+        let height = u64::from_be_bytes(height_array);
+        log::info!("store_full_block: height({})", height);
+
         if !check_key(11, &height_bytes) {
             return Err(StatusCode::InvalidKey);
         }
