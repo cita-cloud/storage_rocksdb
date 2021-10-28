@@ -20,18 +20,19 @@ use cita_cloud_proto::{
 use cloud_util::common::get_tx_hash;
 use cloud_util::crypto::get_block_hash;
 use prost::Message;
-use rocksdb::DB as RocksDB;
+use rocksdb::{DB as RocksDB, BlockBasedOptions};
 use rocksdb::{ColumnFamilyDescriptor, Options};
 use status_code::StatusCode;
 use std::path::Path;
 use std::vec::Vec;
+use crate::config::StorageConfig;
 
 pub struct DB {
     db: RocksDB,
 }
 
 impl DB {
-    pub fn new(db_path: &str) -> Self {
+    pub fn new(db_path: &str, config: &StorageConfig) -> Self {
         let root_path = Path::new(".");
         let path = root_path.join(db_path);
 
@@ -46,6 +47,13 @@ impl DB {
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
         db_opts.create_if_missing(true);
+
+        db_opts.set_write_buffer_size(config.write_buffer_size);
+        db_opts.set_max_background_jobs(config.background_jobs);
+        let block_opts = BlockBasedOptions::default();
+        db_opts.set_block_based_table_factory(&block_opts);
+        db_opts.set_max_open_files(config.max_open_file);
+        db_opts.set_target_file_size_base(config.target_file_size_base);
 
         let db = RocksDB::open_cf_descriptors(&db_opts, path, cfs).unwrap();
 
@@ -321,7 +329,7 @@ mod tests {
          fn prop(args: DBTestArgs) -> bool {
             let dir = tempdir().unwrap();
             let path = dir.path().to_str().unwrap();
-            let db = DB::new(path);
+            let db = DB::new(path, &StorageConfig::default());
 
             let region = args.region;
             let key = args.key.clone();
@@ -435,7 +443,7 @@ mod tests {
     async fn full_block_store_load_test() {
         let dir = tempdir().unwrap();
         let path = dir.path().to_str().unwrap();
-        let db = DB::new(path);
+        let db = DB::new(path, &StorageConfig::default());
         let h = 0;
 
         let (block_hash, block_bytes) = create_full_block(6000, h);
@@ -454,7 +462,7 @@ mod tests {
     fn full_block_store_bench_test() {
         let dir = tempdir().unwrap();
         let path = dir.path().to_str().unwrap();
-        let db = DB::new(path);
+        let db = DB::new(path, &StorageConfig::default());
         let mut h = 0;
 
         let now = Instant::now();

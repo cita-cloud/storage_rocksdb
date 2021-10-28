@@ -206,7 +206,7 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
 
     let db_path = match opts.db_path {
         Some(path) => path,
-        None => config.db_path,
+        None => config.db_path.clone(),
     };
     info!("db path of this service: {}", &db_path);
 
@@ -217,7 +217,7 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
     })?;
 
     // init db
-    let db = DB::new(&db_path);
+    let db = DB::new(&db_path, &config);
     let storage_server = StorageServer::new(db);
 
     Server::builder()

@@ -25,6 +25,14 @@ pub struct StorageConfig {
     pub db_path: String,
 
     pub log_file: String,
+
+    pub write_buffer_size: usize,
+
+    pub background_jobs: i32,
+
+    pub max_open_file: i32,
+
+    pub target_file_size_base: u64
 }
 
 impl Default for StorageConfig {
@@ -34,6 +42,10 @@ impl Default for StorageConfig {
             kms_port: 50005,
             db_path: "chain_data".to_string(),
             log_file: "storage-log4rs.yaml".to_string(),
+            write_buffer_size: 4 * 64 * 1024 * 1024,
+            background_jobs: 2,
+            max_open_file: 512,
+            target_file_size_base: 64 * 1024 * 1024,
         }
     }
 }
@@ -54,5 +66,7 @@ mod tests {
 
         assert_eq!(config.kms_port, 60005);
         assert_eq!(config.storage_port, 60003);
+        assert_eq!(config.write_buffer_size, 65536);
+        assert_eq!(config.max_open_file, 65535);
     }
 }
