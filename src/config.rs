@@ -32,7 +32,7 @@ pub struct StorageConfig {
 
     pub max_open_file: i32,
 
-    pub target_file_size_base: u64
+    pub target_file_size_base: u64,
 }
 
 impl Default for StorageConfig {

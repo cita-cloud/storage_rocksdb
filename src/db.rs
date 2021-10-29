@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::config::StorageConfig;
 use crate::util::{check_key, check_region, check_value, full_to_compact, kms_client};
 use cita_cloud_proto::{
     blockchain::{Block, CompactBlock, RawTransaction, RawTransactions},
@@ -20,12 +21,11 @@ use cita_cloud_proto::{
 use cloud_util::common::get_tx_hash;
 use cloud_util::crypto::get_block_hash;
 use prost::Message;
-use rocksdb::{DB as RocksDB, BlockBasedOptions};
+use rocksdb::{BlockBasedOptions, DB as RocksDB};
 use rocksdb::{ColumnFamilyDescriptor, Options};
 use status_code::StatusCode;
 use std::path::Path;
 use std::vec::Vec;
-use crate::config::StorageConfig;
 
 pub struct DB {
     db: RocksDB,
