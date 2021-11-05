@@ -12,26 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::util::{
-    check_key, check_region, check_value, full_to_compact, get_block_hash, get_tx_hash,
-};
+use crate::config::StorageConfig;
+use crate::util::{check_key, check_region, check_value, full_to_compact, kms_client};
 use cita_cloud_proto::{
     blockchain::{Block, CompactBlock, RawTransaction, RawTransactions},
     storage::Regions,
 };
+use cloud_util::common::get_tx_hash;
+use cloud_util::crypto::get_block_hash;
 use prost::Message;
-use rocksdb::DB as RocksDB;
+use rocksdb::{BlockBasedOptions, DB as RocksDB};
 use rocksdb::{ColumnFamilyDescriptor, Options};
+use status_code::StatusCode;
 use std::path::Path;
 use std::vec::Vec;
-use tonic::Status;
 
 pub struct DB {
     db: RocksDB,
 }
 
 impl DB {
-    pub fn new(db_path: &str) -> Self {
+    pub fn new(db_path: &str, config: &StorageConfig) -> Self {
         let root_path = Path::new(".");
         let path = root_path.join(db_path);
 
@@ -47,101 +48,144 @@ impl DB {
         db_opts.create_missing_column_families(true);
         db_opts.create_if_missing(true);
 
+        db_opts.set_write_buffer_size(config.write_buffer_size);
+        db_opts.set_max_background_jobs(config.background_jobs);
+        let block_opts = BlockBasedOptions::default();
+        db_opts.set_block_based_table_factory(&block_opts);
+        db_opts.set_max_open_files(config.max_open_file);
+        db_opts.set_target_file_size_base(config.target_file_size_base);
+
         let db = RocksDB::open_cf_descriptors(&db_opts, path, cfs).unwrap();
 
         DB { db }
     }
 
-    pub fn store(&self, region: u32, key: Vec<u8>, value: Vec<u8>) -> Result<(), Status> {
+    pub fn store(&self, region: u32, key: Vec<u8>, value: Vec<u8>) -> Result<(), StatusCode> {
         if !check_region(region) {
-            return Err(Status::invalid_argument("invalid region"));
+            return Err(StatusCode::InvalidRegion);
         }
 
         if !check_key(region, &key) {
-            return Err(Status::invalid_argument("invalid key"));
+            return Err(StatusCode::InvalidKey);
         }
 
         if !check_value(region, &value) {
-            return Err(Status::invalid_argument("invalid value"));
+            return Err(StatusCode::InvalidValue);
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
-            let ret = self.db.put_cf(cf, key, value);
-            ret.map_err(|e| Status::aborted(format!("store error: {:?}", e)))
+            self.db.put_cf(cf, key.clone(), value).map_err(|e| {
+                log::warn!(
+                    "store region({}), key({}) error: {:?}",
+                    region,
+                    hex::encode(&key),
+                    e
+                );
+                StatusCode::StoreError
+            })
         } else {
-            Err(Status::aborted("bad region"))
+            log::warn!("store: bad region({})", region);
+            Err(StatusCode::BadRegion)
         }
     }
 
-    pub fn load(&self, region: u32, key: Vec<u8>) -> Result<Vec<u8>, Status> {
+    pub fn load(&self, region: u32, key: Vec<u8>) -> Result<Vec<u8>, StatusCode> {
         if !check_region(region) {
-            return Err(Status::invalid_argument("invalid region"));
+            return Err(StatusCode::InvalidRegion);
         }
 
         if !check_key(region, &key) {
-            return Err(Status::invalid_argument("invalid key"));
+            return Err(StatusCode::InvalidKey);
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
-            let ret = self.db.get_cf(cf, key);
-            match ret {
-                Ok(opt_v) => match opt_v {
-                    Some(v) => Ok(v),
-                    None => Err(Status::not_found("key not found")),
-                },
-                Err(e) => Err(Status::aborted(format!("store error: {:?}", e))),
+            match self.db.get_cf(cf, &key) {
+                Ok(Some(v)) => Ok(v),
+                Ok(None) => {
+                    log::warn!(
+                        "load: region({}), key({}) not found",
+                        region,
+                        hex::encode(&key)
+                    );
+                    Err(StatusCode::NotFound)
+                }
+                Err(e) => {
+                    log::warn!(
+                        "load region({}), key({}) error: {:?}",
+                        region,
+                        hex::encode(&key),
+                        e
+                    );
+                    Err(StatusCode::LoadError)
+                }
             }
         } else {
-            Err(Status::aborted("bad region"))
+            log::warn!("load: bad region({})", region);
+            Err(StatusCode::BadRegion)
         }
     }
 
-    pub fn delete(&self, region: u32, key: Vec<u8>) -> Result<(), Status> {
+    pub fn delete(&self, region: u32, key: Vec<u8>) -> Result<(), StatusCode> {
         if !check_region(region) {
-            return Err(Status::invalid_argument("invalid region"));
+            return Err(StatusCode::InvalidRegion);
         }
 
         if !check_key(region, &key) {
-            return Err(Status::invalid_argument("invalid key"));
+            return Err(StatusCode::InvalidKey);
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
-            let ret = self.db.delete_cf(cf, key);
-            ret.map_err(|e| Status::aborted(format!("store error: {:?}", e)))
+            self.db.delete_cf(cf, &key).map_err(|e| {
+                log::warn!(
+                    "delete: region({}), key({}) error: {:?}",
+                    region,
+                    hex::encode(&key),
+                    e
+                );
+                StatusCode::DeleteError
+            })
         } else {
-            Err(Status::aborted("bad region"))
+            log::warn!("delete: bad region({})", region);
+            Err(StatusCode::BadRegion)
         }
     }
 
-    pub fn store_full_block(
+    pub async fn store_full_block(
         &self,
         height_bytes: Vec<u8>,
         block_bytes: Vec<u8>,
-    ) -> Result<(), Status> {
+    ) -> Result<(), StatusCode> {
+        let mut height_array = [0; 8];
+        height_array.copy_from_slice(&height_bytes);
+        let height = u64::from_be_bytes(height_array);
+        log::info!("store_full_block: height({}) start", height);
+
         if !check_key(11, &height_bytes) {
-            return Err(Status::invalid_argument("invalid key"));
+            return Err(StatusCode::InvalidKey);
         }
 
-        let block = Block::decode(block_bytes.as_slice())
-            .map_err(|_| Status::invalid_argument("decode Block failed"))?;
+        let block = Block::decode(block_bytes.as_slice()).map_err(|_| {
+            log::warn!("store_full_block: decode Block failed");
+            StatusCode::DecodeError
+        })?;
 
-        let block_hash = get_block_hash(block.header.as_ref())?;
+        let block_hash = get_block_hash(kms_client(), block.header.as_ref()).await?;
 
         for (tx_index, raw_tx) in block
             .body
             .clone()
-            .ok_or(Status::invalid_argument("block body not found"))?
+            .ok_or(StatusCode::NoneBlockBody)?
             .body
             .into_iter()
             .enumerate()
         {
             let mut tx_bytes = Vec::new();
-            raw_tx
-                .encode(&mut tx_bytes)
-                .map_err(|_| Status::invalid_argument("encode RawTransaction failed"))?;
+            raw_tx.encode(&mut tx_bytes).map_err(|_| {
+                log::warn!("store_full_block: encode RawTransaction failed");
+                StatusCode::EncodeError
+            })?;
 
-            let tx_hash =
-                get_tx_hash(&raw_tx).ok_or(Status::invalid_argument("can not get tx hash"))?;
+            let tx_hash = get_tx_hash(&raw_tx)?.to_vec();
             self.store(1, tx_hash.clone(), tx_bytes)?;
             self.store(7, tx_hash.clone(), height_bytes.clone())?;
             self.store(9, tx_hash, tx_index.to_be_bytes().to_vec())?;
@@ -155,24 +199,32 @@ impl DB {
         let mut compact_block_bytes = Vec::new();
         compact_block
             .encode(&mut compact_block_bytes)
-            .map_err(|_| Status::invalid_argument("encode CompactBlock failed"))?;
+            .map_err(|_| {
+                log::warn!("store_full_block: encode CompactBlock failed");
+                StatusCode::EncodeError
+            })?;
         self.store(10, height_bytes, compact_block_bytes)?;
+
+        log::info!("store_full_block: height({}) finish", height);
 
         Ok(())
     }
 
-    pub fn load_full_block(&self, height_bytes: Vec<u8>) -> Result<Vec<u8>, Status> {
+    pub fn load_full_block(&self, height_bytes: Vec<u8>) -> Result<Vec<u8>, StatusCode> {
         let compact_block_bytes = self.load(10, height_bytes.clone())?;
-        let compact_block = CompactBlock::decode(compact_block_bytes.as_slice())
-            .map_err(|_| Status::invalid_argument("decode CompactBlock failed"))?;
+        let compact_block = CompactBlock::decode(compact_block_bytes.as_slice()).map_err(|_| {
+            log::warn!("load_full_block: decode CompactBlock failed");
+            StatusCode::EncodeError
+        })?;
 
         let proof = self.load(5, height_bytes)?;
         let block = self.get_full_block(compact_block, proof)?;
 
         let mut block_bytes = Vec::new();
-        block
-            .encode(&mut block_bytes)
-            .map_err(|_| Status::invalid_argument("encode Block failed"))?;
+        block.encode(&mut block_bytes).map_err(|_| {
+            log::warn!("load_full_block: encode Block failed");
+            StatusCode::EncodeError
+        })?;
 
         Ok(block_bytes)
     }
@@ -181,13 +233,15 @@ impl DB {
         &self,
         compact_block: CompactBlock,
         proof: Vec<u8>,
-    ) -> Result<Block, Status> {
+    ) -> Result<Block, StatusCode> {
         let mut body = Vec::new();
         if let Some(compact_body) = compact_block.body {
             for tx_hash in compact_body.tx_hashes {
                 let tx_bytes = self.load(1, tx_hash)?;
-                let raw_tx = RawTransaction::decode(tx_bytes.as_slice())
-                    .map_err(|_| Status::invalid_argument("decode RawTransaction failed"))?;
+                let raw_tx = RawTransaction::decode(tx_bytes.as_slice()).map_err(|_| {
+                    log::warn!("get_full_block: decode RawTransaction failed");
+                    StatusCode::DecodeError
+                })?;
                 body.push(raw_tx)
             }
         }
@@ -204,17 +258,24 @@ impl DB {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "kms")]
     use cita_cloud_proto::blockchain::{
         raw_transaction::Tx, BlockHeader, Transaction, UnverifiedTransaction, Witness,
     };
+    #[cfg(feature = "kms")]
     use minitrace::*;
+    #[cfg(feature = "kms")]
     use minitrace_jaeger::Reporter;
+    #[cfg(feature = "kms")]
     use minitrace_macro::trace;
     use quickcheck::quickcheck;
     use quickcheck::Arbitrary;
     use quickcheck::Gen;
+    #[cfg(feature = "kms")]
     use rand::{thread_rng, Rng};
+    #[cfg(feature = "kms")]
     use std::net::SocketAddr;
+    #[cfg(feature = "kms")]
     use std::time::Instant;
     use tempfile::tempdir;
 
@@ -270,7 +331,7 @@ mod tests {
          fn prop(args: DBTestArgs) -> bool {
             let dir = tempdir().unwrap();
             let path = dir.path().to_str().unwrap();
-            let db = DB::new(path);
+            let db = DB::new(path, &StorageConfig::default());
 
             let region = args.region;
             let key = args.key.clone();
@@ -281,6 +342,7 @@ mod tests {
          }
     }
 
+    #[cfg(feature = "kms")]
     fn build_normal_tx(to: Vec<u8>, data: Vec<u8>, value: Vec<u8>) -> Transaction {
         // get start block number
         let nonce = rand::random::<u64>().to_string();
@@ -296,6 +358,14 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "kms")]
+    pub fn hash_data(data: &[u8]) -> Vec<u8> {
+        let mut result = [0u8; 32];
+        result.copy_from_slice(libsm::sm3::hash::Sm3Hash::new(data).get_hash().as_ref());
+        result.to_vec()
+    }
+
+    #[cfg(feature = "kms")]
     fn prepare_raw_tx(tx: Transaction) -> RawTransaction {
         // calc tx hash
         let tx_hash = {
@@ -330,6 +400,7 @@ mod tests {
     }
 
     #[trace("create_full_block")]
+    #[cfg(feature = "kms")]
     fn create_full_block(tx_num: u64, height: u64) -> (Vec<u8>, Vec<u8>) {
         let default_proof = vec![0; 128];
         let mut rng = thread_rng();
@@ -369,27 +440,31 @@ mod tests {
         (height.to_be_bytes().to_vec(), block_bytes)
     }
 
-    #[test]
-    fn full_block_store_load_test() {
+    #[tokio::test]
+    #[cfg(feature = "kms")]
+    async fn full_block_store_load_test() {
         let dir = tempdir().unwrap();
         let path = dir.path().to_str().unwrap();
-        let db = DB::new(path);
+        let db = DB::new(path, &StorageConfig::default());
         let h = 0;
 
         let (block_hash, block_bytes) = create_full_block(6000, h);
 
         db.store_full_block(block_hash.clone(), block_bytes.clone())
+            .await
             .unwrap();
+
         let load_bytes = db.load_full_block(block_hash).unwrap();
 
         assert_eq!(block_bytes, load_bytes)
     }
 
-    #[test]
+    #[tokio::test]
+    #[cfg(all(feature = "kms", feature = "minitrace"))]
     fn full_block_store_bench_test() {
         let dir = tempdir().unwrap();
         let path = dir.path().to_str().unwrap();
-        let db = DB::new(path);
+        let db = DB::new(path, &StorageConfig::default());
         let mut h = 0;
 
         let now = Instant::now();
@@ -402,7 +477,10 @@ mod tests {
             for _ in 0..5 {
                 let (height_bytes, block_bytes) = create_full_block(6000, h);
 
-                let _ = db.store_full_block(height_bytes, block_bytes);
+                let _ = db
+                    .store_full_block(height_bytes, block_bytes)
+                    .await
+                    .unwrap();
                 h = h + 1;
             }
 

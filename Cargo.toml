@@ -1,34 +1,41 @@
 [package]
 name = "storage"
-version = "6.0.0"
+version = "6.3.0"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
-log = "*"
-log4rs = { version = "*", features = ["default", "gzip"] }
-clap = "3.0.0-beta.2"
-git-version = "*"
-tonic = "*"
-prost = "*"
-tokio = { version = "*", features = ["full"] }
-cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto", branch = "full_block_store_dev" }
-rocksdb = "*"
-hex = "*"
-libsm = "0.4"
+log = "0.4.14"
+log4rs = { version = "1.0.0", features = ["default", "gzip"] }
+clap = "=3.0.0-beta.4"
+clap_derive = "=3.0.0-beta.4"
+git-version = "0.3.4"
+tonic = "0.5.0"
+prost = "0.8.0"
+tokio = { version = "1.8.1", features = ["full"] }
+
+cloud-util = "0.1"
+cita_cloud_proto = "=6.3.0"
+status_code = { package = "cloud-code", version = "0.1" }
+
+rocksdb = "0.17.0"
+hex = "0.4.3"
+serde = "1.0.126"
+serde_derive = "1.0.126"
 
 [[bin]]
 name = "bench"
 path = "benches/main.rs"
 
 [dev-dependencies]
-tempfile = "*"
-quickcheck = "*"
+tempfile = "3.2.0"
+quickcheck = "1.0.3"
 rand = "0.8"
 minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
+libsm = "0.4.1"
 
 [profile.release.package."*"]
 # Set the default for dependencies.

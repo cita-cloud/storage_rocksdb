@@ -1,4 +1,5 @@
 use cita_cloud_proto::storage::{storage_service_client::StorageServiceClient, Content};
+use status_code::StatusCode;
 use tonic::Request;
 
 pub async fn store_data(
@@ -13,7 +14,7 @@ pub async fn store_data(
     let request = Request::new(Content { region, key, value });
 
     let response = client.store(request).await?;
-    Ok(response.into_inner().is_success)
+    Ok(StatusCode::from(response.into_inner()).is_success().is_ok())
 }
 
 fn main() {
