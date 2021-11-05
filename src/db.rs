@@ -158,7 +158,7 @@ impl DB {
         let mut height_array = [0; 8];
         height_array.copy_from_slice(&height_bytes);
         let height = u64::from_be_bytes(height_array);
-        log::info!("store_full_block: height({})", height);
+        log::info!("store_full_block: height({}) start", height);
 
         if !check_key(11, &height_bytes) {
             return Err(StatusCode::InvalidKey);
@@ -204,6 +204,8 @@ impl DB {
                 StatusCode::EncodeError
             })?;
         self.store(10, height_bytes, compact_block_bytes)?;
+
+        log::info!("store_full_block: height({}) finish", height);
 
         Ok(())
     }
