@@ -15,9 +15,9 @@ tonic = "0.5.0"
 prost = "0.8.0"
 tokio = { version = "1.8.1", features = ["full"] }
 
-cloud-util = "0.1"
-cita_cloud_proto = "=6.3.0"
-status_code = { package = "cloud-code", version = "0.1" }
+cloud-util = { git = "https://github.com/cita-cloud/cloud-util.git" }
+cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto.git" }
+status_code = { package = "cloud-code", git = "https://github.com/cita-cloud/status_code.git" }
 
 rocksdb = "0.17.0"
 hex = "0.4.3"
