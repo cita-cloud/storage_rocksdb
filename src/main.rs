@@ -16,7 +16,7 @@ mod config;
 mod db;
 mod util;
 
-use clap::Clap;
+use clap::Parser;
 use git_version::git_version;
 use log::{debug, info, warn};
 
@@ -27,14 +27,14 @@ const GIT_VERSION: &str = git_version!(
 const GIT_HOMEPAGE: &str = "https://github.com/cita-cloud/storage_rocksdb";
 
 /// network service
-#[derive(Clap)]
+#[derive(Parser)]
 #[clap(version = "0.1.0", author = "Rivtower Technologies.")]
 struct Opts {
     #[clap(subcommand)]
     subcmd: SubCommand,
 }
 
-#[derive(Clap)]
+#[derive(Parser)]
 enum SubCommand {
     /// print information from git
     #[clap(name = "git")]
@@ -45,7 +45,7 @@ enum SubCommand {
 }
 
 /// A subcommand for run
-#[derive(Clap)]
+#[derive(Parser)]
 struct RunOpts {
     /// Sets grpc port of this service.
     #[clap(short = 'p', long = "port", default_value = "50003")]
