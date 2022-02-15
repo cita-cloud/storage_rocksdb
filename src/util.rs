@@ -24,6 +24,7 @@ use tonic::transport::{Channel, Endpoint};
 pub static KMS_CLIENT: OnceCell<KmsServiceClient<Channel>> = OnceCell::const_new();
 
 // This must be called before access to clients.
+#[allow(dead_code)]
 pub fn init_grpc_client(config: &StorageConfig) {
     KMS_CLIENT
         .set({
