@@ -47,15 +47,12 @@ enum SubCommand {
 /// A subcommand for run
 #[derive(Parser)]
 struct RunOpts {
-    /// Sets grpc port of this service.
-    #[clap(short = 'p', long = "port", default_value = "50003")]
-    grpc_port: String,
-    /// Sets db path.
-    #[clap(short = 'd', long = "db")]
-    db_path: Option<String>,
     /// Chain config path
     #[clap(short = 'c', long = "config", default_value = "config.toml")]
     config_path: String,
+    /// log config path
+    #[clap(short = 'l', long = "log", default_value = "storage-log4rs.yaml")]
+    log_file: String,
 }
 
 fn main() {
@@ -191,33 +188,22 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
     let config = StorageConfig::new(&opts.config_path);
     init_grpc_client(&config);
     // init log4rs
-    log4rs::init_file(&config.log_file, Default::default()).unwrap();
+    log4rs::init_file(&opts.log_file, Default::default())
+        .map_err(|e| println!("log init err: {}", e))
+        .unwrap();
 
-    let grpc_port = {
-        if "50003" != opts.grpc_port {
-            opts.grpc_port.clone()
-        } else if config.storage_port != 50003 {
-            config.storage_port.to_string()
-        } else {
-            "50003".to_string()
-        }
-    };
-    info!("grpc port of this service: {}", grpc_port);
+    info!("grpc port of this service: {}", &config.storage_port);
 
-    let db_path = match opts.db_path {
-        Some(path) => path,
-        None => config.db_path.clone(),
-    };
-    info!("db path of this service: {}", &db_path);
+    info!("db path of this service: {}", &config.db_path);
 
-    let addr_str = format!("127.0.0.1:{}", grpc_port);
+    let addr_str = format!("127.0.0.1:{}", config.storage_port);
     let addr = addr_str.parse().map_err(|e: AddrParseError| {
-        warn!("grpc listen addr parse failed: {} ", e.to_string());
+        warn!("grpc listen addr parse failed: {} ", e);
         StatusCode::FatalError
     })?;
 
     // init db
-    let db = DB::new(&db_path, &config);
+    let db = DB::new(&config.db_path, &config);
     let storage_server = StorageServer::new(db);
 
     Server::builder()
