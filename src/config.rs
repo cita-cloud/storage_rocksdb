@@ -24,8 +24,6 @@ pub struct StorageConfig {
 
     pub db_path: String,
 
-    pub log_file: String,
-
     pub write_buffer_size: usize,
 
     pub background_jobs: i32,
@@ -41,7 +39,6 @@ impl Default for StorageConfig {
             storage_port: 50003,
             kms_port: 50005,
             db_path: "chain_data".to_string(),
-            log_file: "storage-log4rs.yaml".to_string(),
             write_buffer_size: 4 * 64 * 1024 * 1024,
             background_jobs: 2,
             max_open_file: 512,
