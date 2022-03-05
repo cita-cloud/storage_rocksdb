@@ -26,7 +26,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..1000u64 {
         let mut hash = Vec::new();
         for _ in 0..4 {
-            hash.extend_from_slice(&i.to_be_bytes().to_vec());
+            hash.extend_from_slice(i.to_be_bytes().as_ref());
         }
         let _ = store_data(50003, 9, hash.to_vec(), i.to_be_bytes().to_vec()).await?;
     }
