@@ -28,7 +28,7 @@ const GIT_HOMEPAGE: &str = "https://github.com/cita-cloud/storage_rocksdb";
 
 /// network service
 #[derive(Parser)]
-#[clap(version = "0.1.0", author = "Rivtower Technologies.")]
+#[clap(version, author)]
 struct Opts {
     #[clap(subcommand)]
     subcmd: SubCommand,
