@@ -81,6 +81,7 @@ use cita_cloud_proto::storage::{
 use db::DB;
 use status_code::StatusCode;
 use std::net::AddrParseError;
+use std::path::Path;
 use tonic::{transport::Server, Request, Response, Status};
 
 pub struct StorageServer {
@@ -194,6 +195,11 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
 
     info!("grpc port of this service: {}", &config.storage_port);
 
+    // db_path must be relative path
+    assert!(
+        !Path::new(&config.db_path).is_absolute(),
+        "db_path must be relative path"
+    );
     info!("db path of this service: {}", &config.db_path);
 
     let addr_str = format!("127.0.0.1:{}", config.storage_port);
