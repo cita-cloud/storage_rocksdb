@@ -14,6 +14,7 @@
 
 mod config;
 mod db;
+mod health_check;
 mod util;
 
 use clap::Parser;
@@ -73,7 +74,9 @@ fn main() {
 }
 
 use crate::config::StorageConfig;
+use crate::health_check::HealthCheckServer;
 use crate::util::init_grpc_client;
+use cita_cloud_proto::health_check::health_server::HealthServer;
 use cita_cloud_proto::storage::{
     storage_service_server::StorageService, storage_service_server::StorageServiceServer, Content,
     ExtKey, Value,
@@ -214,6 +217,7 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
 
     Server::builder()
         .add_service(StorageServiceServer::new(storage_server))
+        .add_service(HealthServer::new(HealthCheckServer {}))
         .serve(addr)
         .await
         .map_err(|e| {
