@@ -1,9 +1,9 @@
 [package]
 name = "storage"
-version = "6.3.3"
+version = "6.4.0"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 license = "Apache-2.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 log = "0.4.14"
@@ -35,9 +35,6 @@ minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
 libsm = "0.4.1"
-
-[patch."https://github.com/cita-cloud/cita_cloud_proto"]
-cita_cloud_proto = { git = "https://github.com/rink1969/cita_cloud_proto.git", branch = "health_check" }
 
 [profile.release.package."*"]
 # Set the default for dependencies.
