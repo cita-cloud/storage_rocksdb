@@ -11,7 +11,7 @@ docker build -t citacloud/storage_rocksdb .
 
 ```
 $ storage -h
-storage 6.3.3
+storage 6.4.0
 Rivtower Technologies <contact@rivtower.com>
 network service
 
@@ -23,19 +23,8 @@ OPTIONS:
     -V, --version    Print version information
 
 SUBCOMMANDS:
-    git     print information from git
     help    Print this message or the help of the given subcommand(s)
     run     run this service
-```
-
-### storage-git
-
-打印`git`相关的信息。
-
-```
-$ storage git
-git version: 32c0350
-homepage: https://github.com/cita-cloud/storage_rocksdb
 ```
 
 ### storage-run

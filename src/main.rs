@@ -18,14 +18,7 @@ mod health_check;
 mod util;
 
 use clap::Parser;
-use git_version::git_version;
 use log::{debug, info, warn};
-
-const GIT_VERSION: &str = git_version!(
-    args = ["--tags", "--always", "--dirty=-modified"],
-    fallback = "unknown"
-);
-const GIT_HOMEPAGE: &str = "https://github.com/cita-cloud/storage_rocksdb";
 
 /// network service
 #[derive(Parser)]
@@ -37,9 +30,6 @@ struct Opts {
 
 #[derive(Parser)]
 enum SubCommand {
-    /// print information from git
-    #[clap(name = "git")]
-    GitInfo,
     /// run this service
     #[clap(name = "run")]
     Run(RunOpts),
@@ -62,10 +52,6 @@ fn main() {
     let opts: Opts = Opts::parse();
 
     match opts.subcmd {
-        SubCommand::GitInfo => {
-            println!("git version: {}", GIT_VERSION);
-            println!("homepage: {}", GIT_HOMEPAGE);
-        }
         SubCommand::Run(opts) => {
             let fin = run(opts);
             warn!("Should not reach here {:?}", fin);
