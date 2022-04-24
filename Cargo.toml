@@ -13,9 +13,9 @@ tonic = "0.5"
 prost = "0.8"
 tokio = { version = "1.17", features = ["full"] }
 
-cloud-util = { git = "https://github.com/cita-cloud/cloud-util.git" }
-cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto.git" }
-status_code = { package = "cloud-code", git = "https://github.com/cita-cloud/status_code.git" }
+cloud-util = "0.2"
+cita_cloud_proto = "=6.4.0"
+status_code = { package = "cloud-code", version = "0.2" }
 
 rocksdb = "0.18"
 hex = "0.4"
@@ -30,9 +30,9 @@ path = "benches/main.rs"
 tempfile = "3.3"
 quickcheck = "1.0"
 rand = "0.8"
-minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
-minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
-minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
+minitrace = "0.4"
+minitrace-jaeger = "0.4"
+minitrace-macro = "0.4"
 libsm = "0.4"
 
 [profile.release.package."*"]
