@@ -33,7 +33,7 @@ rand = "0.8"
 minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
-libsm = "0.4"
+libsm = "0.5.0"
 
 [profile.release.package."*"]
 # Set the default for dependencies.
