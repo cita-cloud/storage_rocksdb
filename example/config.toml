@@ -1,5 +1,5 @@
 [storage_rocksdb]
-kms_port = 60005
+crypto_port = 60005
 storage_port = 60003
 write_buffer_size = 65536
 max_open_file = 65535

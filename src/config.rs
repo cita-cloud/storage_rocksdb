@@ -20,7 +20,7 @@ use serde_derive::Deserialize;
 pub struct StorageConfig {
     pub storage_port: u16,
 
-    pub kms_port: u16,
+    pub crypto_port: u16,
 
     pub db_path: String,
 
@@ -37,7 +37,7 @@ impl Default for StorageConfig {
     fn default() -> Self {
         Self {
             storage_port: 50003,
-            kms_port: 50005,
+            crypto_port: 50005,
             db_path: "chain_data".to_string(),
             write_buffer_size: 4 * 64 * 1024 * 1024,
             background_jobs: 2,
@@ -61,7 +61,7 @@ mod tests {
     fn basic_test() {
         let config = StorageConfig::new("example/config.toml");
 
-        assert_eq!(config.kms_port, 60005);
+        assert_eq!(config.crypto_port, 60005);
         assert_eq!(config.storage_port, 60003);
         assert_eq!(config.write_buffer_size, 65536);
         assert_eq!(config.max_open_file, 65535);

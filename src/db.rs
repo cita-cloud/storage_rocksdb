@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::config::StorageConfig;
-use crate::util::{check_key, check_region, check_value, full_to_compact, kms_client};
+use crate::util::{check_key, check_region, check_value, crypto_client, full_to_compact};
 use cita_cloud_proto::{
     blockchain::{Block, CompactBlock, RawTransaction, RawTransactions},
     storage::Regions,
@@ -169,7 +169,7 @@ impl DB {
             StatusCode::DecodeError
         })?;
 
-        let block_hash = get_block_hash(kms_client(), block.header.as_ref()).await?;
+        let block_hash = get_block_hash(crypto_client(), block.header.as_ref()).await?;
 
         for (tx_index, raw_tx) in block
             .body
@@ -258,24 +258,24 @@ impl DB {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     use cita_cloud_proto::blockchain::{
         raw_transaction::Tx, BlockHeader, Transaction, UnverifiedTransaction, Witness,
     };
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     use minitrace::*;
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     use minitrace_jaeger::Reporter;
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     use minitrace_macro::trace;
     use quickcheck::quickcheck;
     use quickcheck::Arbitrary;
     use quickcheck::Gen;
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     use rand::{thread_rng, Rng};
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     use std::net::SocketAddr;
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     use std::time::Instant;
     use tempfile::tempdir;
 
@@ -342,7 +342,7 @@ mod tests {
          }
     }
 
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     fn build_normal_tx(to: Vec<u8>, data: Vec<u8>, value: Vec<u8>) -> Transaction {
         // get start block number
         let nonce = rand::random::<u64>().to_string();
@@ -358,14 +358,14 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     pub fn hash_data(data: &[u8]) -> Vec<u8> {
         let mut result = [0u8; 32];
         result.copy_from_slice(libsm::sm3::hash::Sm3Hash::new(data).get_hash().as_ref());
         result.to_vec()
     }
 
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     fn prepare_raw_tx(tx: Transaction) -> RawTransaction {
         // calc tx hash
         let tx_hash = {
@@ -400,7 +400,7 @@ mod tests {
     }
 
     #[trace("create_full_block")]
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     fn create_full_block(tx_num: u64, height: u64) -> (Vec<u8>, Vec<u8>) {
         let default_proof = vec![0; 128];
         let mut rng = thread_rng();
@@ -441,7 +441,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "kms")]
+    #[cfg(feature = "crypto")]
     async fn full_block_store_load_test() {
         let dir = tempdir().unwrap();
         let path = dir.path().to_str().unwrap();
@@ -460,7 +460,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(all(feature = "kms", feature = "minitrace"))]
+    #[cfg(all(feature = "crypto", feature = "minitrace"))]
     fn full_block_store_bench_test() {
         let dir = tempdir().unwrap();
         let path = dir.path().to_str().unwrap();

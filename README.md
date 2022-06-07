@@ -51,7 +51,7 @@ OPTIONS:
     参见示例`example/config.toml`。
 
     其中：
-    * `kms_port` 为依赖的`KMS`微服务的`gRPC`服务监听的端口号。
+    * `crypto_port` 为依赖的`Crypto`微服务的`gRPC`服务监听的端口号。
     * `storage_port` 为本微服务的`gRPC`服务监听的端口号。
     * `write_buffer_size` 设置`rocksdb`的写缓存大小，单位为字节。
     * `max_open_file` 设置`rocksdb`最大打开文件数量。
