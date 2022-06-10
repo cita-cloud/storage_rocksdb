@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::config::StorageConfig;
-use cita_cloud_proto::kms::kms_service_client::KmsServiceClient;
+use cita_cloud_proto::crypto::crypto_service_client::CryptoServiceClient;
 use cita_cloud_proto::{
     blockchain::{raw_transaction::Tx, Block, CompactBlock, CompactBlockBody},
     storage::Regions,
@@ -21,22 +21,22 @@ use cita_cloud_proto::{
 use tokio::sync::OnceCell;
 use tonic::transport::{Channel, Endpoint};
 
-pub static KMS_CLIENT: OnceCell<KmsServiceClient<Channel>> = OnceCell::const_new();
+pub static CRYPTO_CLIENT: OnceCell<CryptoServiceClient<Channel>> = OnceCell::const_new();
 
 // This must be called before access to clients.
 #[allow(dead_code)]
 pub fn init_grpc_client(config: &StorageConfig) {
-    KMS_CLIENT
+    CRYPTO_CLIENT
         .set({
-            let addr = format!("http://127.0.0.1:{}", config.kms_port);
+            let addr = format!("http://127.0.0.1:{}", config.crypto_port);
             let channel = Endpoint::from_shared(addr).unwrap().connect_lazy().unwrap();
-            KmsServiceClient::new(channel)
+            CryptoServiceClient::new(channel)
         })
         .unwrap();
 }
 
-pub fn kms_client() -> KmsServiceClient<Channel> {
-    KMS_CLIENT.get().cloned().unwrap()
+pub fn crypto_client() -> CryptoServiceClient<Channel> {
+    CRYPTO_CLIENT.get().cloned().unwrap()
 }
 
 pub fn check_region(region: u32) -> bool {
