@@ -15,8 +15,10 @@
 mod config;
 mod db;
 mod health_check;
+mod panic_hook;
 mod util;
 
+use crate::panic_hook::set_panic_handler;
 use clap::Parser;
 use log::{debug, info, warn};
 
@@ -48,6 +50,7 @@ struct RunOpts {
 
 fn main() {
     ::std::env::set_var("RUST_BACKTRACE", "full");
+    set_panic_handler();
 
     let opts: Opts = Opts::parse();
 
@@ -71,14 +74,15 @@ use db::DB;
 use status_code::StatusCode;
 use std::net::AddrParseError;
 use std::path::Path;
+use std::sync::Arc;
 use tonic::{transport::Server, Request, Response, Status};
 
 pub struct StorageServer {
-    db: DB,
+    db: Arc<DB>,
 }
 
 impl StorageServer {
-    fn new(db: DB) -> Self {
+    fn new(db: Arc<DB>) -> Self {
         StorageServer { db }
     }
 }
@@ -198,12 +202,12 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
     })?;
 
     // init db
-    let db = DB::new(&config.db_path, &config);
-    let storage_server = StorageServer::new(db);
+    let db = Arc::new(DB::new(&config.db_path, &config));
+    let storage_server = StorageServer::new(db.clone());
 
     Server::builder()
         .add_service(StorageServiceServer::new(storage_server))
-        .add_service(HealthServer::new(HealthCheckServer {}))
+        .add_service(HealthServer::new(HealthCheckServer::new(db)))
         .serve(addr)
         .await
         .map_err(|e| {
