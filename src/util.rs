@@ -29,7 +29,7 @@ pub fn init_grpc_client(config: &StorageConfig) {
     CRYPTO_CLIENT
         .set({
             let addr = format!("http://127.0.0.1:{}", config.crypto_port);
-            let channel = Endpoint::from_shared(addr).unwrap().connect_lazy().unwrap();
+            let channel = Endpoint::from_shared(addr).unwrap().connect_lazy();
             CryptoServiceClient::new(channel)
         })
         .unwrap();
