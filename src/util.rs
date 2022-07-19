@@ -13,29 +13,36 @@
 // limitations under the License.
 
 use crate::config::StorageConfig;
+use cita_cloud_proto::client::{ClientOptions, InterceptedSvc};
 use cita_cloud_proto::crypto::crypto_service_client::CryptoServiceClient;
+use cita_cloud_proto::retry::RetryClient;
 use cita_cloud_proto::{
     blockchain::{raw_transaction::Tx, Block, CompactBlock, CompactBlockBody},
     storage::Regions,
 };
 use tokio::sync::OnceCell;
-use tonic::transport::{Channel, Endpoint};
 
-pub static CRYPTO_CLIENT: OnceCell<CryptoServiceClient<Channel>> = OnceCell::const_new();
+pub static CRYPTO_CLIENT: OnceCell<RetryClient<CryptoServiceClient<InterceptedSvc>>> =
+    OnceCell::const_new();
 
 // This must be called before access to clients.
 #[allow(dead_code)]
 pub fn init_grpc_client(config: &StorageConfig) {
     CRYPTO_CLIENT
         .set({
-            let addr = format!("http://127.0.0.1:{}", config.crypto_port);
-            let channel = Endpoint::from_shared(addr).unwrap().connect_lazy();
-            CryptoServiceClient::new(channel)
+            let client_options = ClientOptions::new(
+                "crypto".to_string(),
+                format!("http://127.0.0.1:{}", config.crypto_port),
+            );
+            match client_options.connect_crypto() {
+                Ok(retry_client) => retry_client,
+                Err(e) => panic!("client init error: {:?}", &e),
+            }
         })
         .unwrap();
 }
 
-pub fn crypto_client() -> CryptoServiceClient<Channel> {
+pub fn crypto_client() -> RetryClient<CryptoServiceClient<InterceptedSvc>> {
     CRYPTO_CLIENT.get().cloned().unwrap()
 }
 
