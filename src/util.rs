@@ -25,13 +25,15 @@ use tokio::sync::OnceCell;
 pub static CRYPTO_CLIENT: OnceCell<RetryClient<CryptoServiceClient<InterceptedSvc>>> =
     OnceCell::const_new();
 
+const CLIENT_NAME: &str = "storage";
+
 // This must be called before access to clients.
 #[allow(dead_code)]
 pub fn init_grpc_client(config: &StorageConfig) {
     CRYPTO_CLIENT
         .set({
             let client_options = ClientOptions::new(
-                "crypto".to_string(),
+                CLIENT_NAME.to_string(),
                 format!("http://127.0.0.1:{}", config.crypto_port),
             );
             match client_options.connect_crypto() {
