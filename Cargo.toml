@@ -12,17 +12,19 @@ clap = { version = "3.1", features = ["derive"] }
 tonic = "0.7"
 prost = "0.10"
 tokio = { version = "1.17", features = ["full"] }
-
-cloud-util = { git = "https://github.com/cita-cloud/cloud-util.git" }
-cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto.git" }
-status_code = { package = "cloud-code", git = "https://github.com/cita-cloud/status_code.git" }
-
 rocksdb = "0.18"
 hex = "0.4"
 serde = "1.0"
 serde_derive = "1.0"
-
 backtrace = "0.3"
+tower = "0.4.13"
+futures = "0.3.21"
+hyper = { version = "0.14", features = ["full"] }
+prometheus = "0.13"
+
+cloud-util = { git = "https://github.com/cita-cloud/cloud-util.git" }
+cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto.git" }
+status_code = { package = "cloud-code", git = "https://github.com/cita-cloud/status_code.git" }
 
 [[bin]]
 name = "bench"
