@@ -31,6 +31,8 @@ pub struct StorageConfig {
     pub max_open_file: i32,
 
     pub target_file_size_base: u64,
+
+    pub enable_metrics: bool,
 }
 
 impl Default for StorageConfig {
@@ -43,6 +45,7 @@ impl Default for StorageConfig {
             background_jobs: 2,
             max_open_file: 512,
             target_file_size_base: 64 * 1024 * 1024,
+            enable_metrics: true,
         }
     }
 }
