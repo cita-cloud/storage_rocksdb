@@ -31,6 +31,12 @@ pub struct StorageConfig {
     pub max_open_file: i32,
 
     pub target_file_size_base: u64,
+
+    pub enable_metrics: bool,
+
+    pub metrics_port: u16,
+
+    pub metrics_buckets: Vec<f64>,
 }
 
 impl Default for StorageConfig {
@@ -43,6 +49,11 @@ impl Default for StorageConfig {
             background_jobs: 2,
             max_open_file: 512,
             target_file_size_base: 64 * 1024 * 1024,
+            enable_metrics: true,
+            metrics_port: 60003,
+            metrics_buckets: vec![
+                0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0,
+            ],
         }
     }
 }
