@@ -1,6 +1,6 @@
 [package]
 name = "storage"
-version = "6.5.0"
+version = "6.6.0"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 license = "Apache-2.0"
 edition = "2021"
@@ -17,7 +17,7 @@ cloud-util = { git = "https://github.com/cita-cloud/cloud-util.git" }
 cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto.git" }
 status_code = { package = "cloud-code", git = "https://github.com/cita-cloud/status_code.git" }
 
-rocksdb = "0.18"
+rocksdb = "0.19"
 hex = "0.4"
 serde = "1.0"
 serde_derive = "1.0"
