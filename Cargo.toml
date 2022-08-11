@@ -7,15 +7,15 @@ edition = "2021"
 
 [dependencies]
 log = "0.4"
-log4rs = { version = "1.0", features = ["gzip"] }
-clap = { version = "3.1", features = ["derive"] }
+log4rs = { version = "1.1", features = ["gzip"] }
+clap = { version = "3.2", features = ["derive"] }
 tonic = "0.7"
 prost = "0.10"
-tokio = { version = "1.17", features = ["full"] }
+tokio = { version = "1.20", features = ["full"] }
 
-cloud-util = { git = "https://github.com/cita-cloud/cloud-util.git" }
-cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto.git" }
-status_code = { package = "cloud-code", git = "https://github.com/cita-cloud/status_code.git" }
+cloud-util = "0.4.1"
+cita_cloud_proto = "6.6.0"
+status_code = { package = "cloud-code", version = "0.4.0" }
 
 rocksdb = "0.19"
 hex = "0.4"
