@@ -11,7 +11,7 @@ docker build -t citacloud/storage_rocksdb .
 
 ```
 $ storage -h
-storage 6.4.0
+storage 6.6.0
 Rivtower Technologies <contact@rivtower.com>
 network service
 
