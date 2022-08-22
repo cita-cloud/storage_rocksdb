@@ -180,6 +180,8 @@ impl StorageService for StorageServer {
 
 #[tokio::main]
 async fn run(opts: RunOpts) -> Result<(), StatusCode> {
+    tokio::spawn(cloud_util::signal::handle_signals());
+
     let config = StorageConfig::new(&opts.config_path);
     init_grpc_client(&config);
     // init log4rs
