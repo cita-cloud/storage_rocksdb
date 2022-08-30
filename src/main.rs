@@ -101,11 +101,11 @@ impl StorageService for StorageServer {
         let key = content.key;
         let value = content.value;
 
-        if region == 11 {
-            match self.db.store_full_block(key, value).await {
+        if region == 12 {
+            match self.db.store_all_block_data(key, value).await {
                 Ok(()) => Ok(Response::new(StatusCode::Success.into())),
                 Err(status) => {
-                    warn!("store_full_block failed: {}", status.to_string());
+                    warn!("store_all_block_data failed: {}", status.to_string());
                     Ok(Response::new(status.into()))
                 }
             }
