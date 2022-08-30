@@ -70,6 +70,7 @@ use cita_cloud_proto::storage::{
     storage_service_server::StorageService, storage_service_server::StorageServiceServer, Content,
     ExtKey, Value,
 };
+use cloud_util::metrics::{run_metrics_exporter, MiddlewareLayer};
 use db::DB;
 use status_code::StatusCode;
 use std::net::AddrParseError;
@@ -179,6 +180,8 @@ impl StorageService for StorageServer {
 
 #[tokio::main]
 async fn run(opts: RunOpts) -> Result<(), StatusCode> {
+    tokio::spawn(cloud_util::signal::handle_signals());
+
     let config = StorageConfig::new(&opts.config_path);
     init_grpc_client(&config);
     // init log4rs
@@ -186,7 +189,7 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
         .map_err(|e| println!("log init err: {}", e))
         .unwrap();
 
-    info!("grpc port of this service: {}", &config.storage_port);
+    info!("grpc port of storage_rocksdb: {}", &config.storage_port);
 
     // db_path must be relative path
     assert!(
@@ -205,15 +208,51 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
     let db = Arc::new(DB::new(&config.db_path, &config));
     let storage_server = StorageServer::new(db.clone());
 
-    Server::builder()
-        .add_service(StorageServiceServer::new(storage_server))
-        .add_service(HealthServer::new(HealthCheckServer::new(db)))
-        .serve(addr)
-        .await
-        .map_err(|e| {
-            warn!("start controller grpc server failed: {} ", e.to_string());
-            StatusCode::FatalError
-        })?;
+    let layer = if config.enable_metrics {
+        tokio::spawn(async move {
+            run_metrics_exporter(config.metrics_port).await.unwrap();
+        });
+
+        Some(
+            tower::ServiceBuilder::new()
+                .layer(MiddlewareLayer::new(config.metrics_buckets))
+                .into_inner(),
+        )
+    } else {
+        None
+    };
+
+    info!("start storage_rocksdb grpc server");
+    if layer.is_some() {
+        info!("metrics on");
+        Server::builder()
+            .layer(layer.unwrap())
+            .add_service(StorageServiceServer::new(storage_server))
+            .add_service(HealthServer::new(HealthCheckServer::new(db)))
+            .serve(addr)
+            .await
+            .map_err(|e| {
+                warn!(
+                    "start storage_rocksdb grpc server failed: {} ",
+                    e.to_string()
+                );
+                StatusCode::FatalError
+            })?;
+    } else {
+        info!("metrics off");
+        Server::builder()
+            .add_service(StorageServiceServer::new(storage_server))
+            .add_service(HealthServer::new(HealthCheckServer::new(db)))
+            .serve(addr)
+            .await
+            .map_err(|e| {
+                warn!(
+                    "start storage_rocksdb grpc server failed: {} ",
+                    e.to_string()
+                );
+                StatusCode::FatalError
+            })?;
+    }
 
     Ok(())
 }
