@@ -150,7 +150,7 @@ impl DB {
         }
     }
 
-    pub async fn store_full_block(
+    pub async fn store_all_block_data(
         &self,
         height_bytes: Vec<u8>,
         block_bytes: Vec<u8>,
@@ -158,14 +158,14 @@ impl DB {
         let mut height_array = [0; 8];
         height_array.copy_from_slice(&height_bytes);
         let height = u64::from_be_bytes(height_array);
-        log::info!("store_full_block: height({}) start", height);
+        log::info!("store_all_block_data: height({}) start", height);
 
         if !check_key(11, &height_bytes) {
             return Err(StatusCode::InvalidKey);
         }
 
         let block = Block::decode(block_bytes.as_slice()).map_err(|_| {
-            log::warn!("store_full_block: decode Block failed");
+            log::warn!("store_all_block_data: decode Block failed");
             StatusCode::DecodeError
         })?;
 
@@ -181,63 +181,93 @@ impl DB {
         {
             let mut tx_bytes = Vec::new();
             raw_tx.encode(&mut tx_bytes).map_err(|_| {
-                log::warn!("store_full_block: encode RawTransaction failed");
+                log::warn!("store_all_block_data: encode RawTransaction failed");
                 StatusCode::EncodeError
             })?;
 
             let tx_hash = get_tx_hash(&raw_tx)?.to_vec();
-            self.store(1, tx_hash.clone(), tx_bytes)?;
-            self.store(7, tx_hash.clone(), height_bytes.clone())?;
-            self.store(9, tx_hash, tx_index.to_be_bytes().to_vec())?;
+            self.store(
+                i32::from(Regions::Transactions) as u32,
+                tx_hash.clone(),
+                tx_bytes,
+            )?;
+            self.store(
+                i32::from(Regions::TransactionHash2blockHeight) as u32,
+                tx_hash.clone(),
+                height_bytes.clone(),
+            )?;
+            self.store(
+                i32::from(Regions::TransactionIndex) as u32,
+                tx_hash,
+                tx_index.to_be_bytes().to_vec(),
+            )?;
         }
 
-        self.store(4, height_bytes.clone(), block_hash.clone())?;
-        self.store(8, block_hash, height_bytes.clone())?;
-        self.store(5, height_bytes.clone(), block.proof.clone())?;
+        self.store(
+            i32::from(Regions::Global) as u32,
+            0u64.to_be_bytes().to_vec(),
+            height_bytes.clone(),
+        )?;
+        self.store(
+            i32::from(Regions::Global) as u32,
+            1u64.to_be_bytes().to_vec(),
+            block_hash.clone(),
+        )?;
+        self.store(
+            i32::from(Regions::BlockHash) as u32,
+            height_bytes.clone(),
+            block_hash.clone(),
+        )?;
+        self.store(
+            i32::from(Regions::Proof) as u32,
+            height_bytes.clone(),
+            block.proof.clone(),
+        )?;
+        self.store(
+            i32::from(Regions::Result) as u32,
+            height_bytes.clone(),
+            block.state_root.clone(),
+        )?;
+        self.store(
+            i32::from(Regions::BlockHash2blockHeight) as u32,
+            block_hash,
+            height_bytes.clone(),
+        )?;
 
         let compact_block = full_to_compact(block);
         let mut compact_block_bytes = Vec::new();
         compact_block
             .encode(&mut compact_block_bytes)
             .map_err(|_| {
-                log::warn!("store_full_block: encode CompactBlock failed");
+                log::warn!("store_all_block_data: encode CompactBlock failed");
                 StatusCode::EncodeError
             })?;
-        self.store(10, height_bytes, compact_block_bytes)?;
+        self.store(
+            i32::from(Regions::CompactBlock) as u32,
+            height_bytes,
+            compact_block_bytes,
+        )?;
 
-        log::info!("store_full_block: height({}) finish", height);
+        log::info!("store_all_block_data: height({}) finish", height);
 
         Ok(())
     }
 
     pub fn load_full_block(&self, height_bytes: Vec<u8>) -> Result<Vec<u8>, StatusCode> {
-        let compact_block_bytes = self.load(10, height_bytes.clone())?;
+        // get compact_block
+        let compact_block_bytes = self.load(
+            i32::from(Regions::CompactBlock) as u32,
+            height_bytes.clone(),
+        )?;
         let compact_block = CompactBlock::decode(compact_block_bytes.as_slice()).map_err(|_| {
             log::warn!("load_full_block: decode CompactBlock failed");
             StatusCode::EncodeError
         })?;
 
-        let proof = self.load(5, height_bytes)?;
-        let block = self.get_full_block(compact_block, proof)?;
-
-        let mut block_bytes = Vec::new();
-        block.encode(&mut block_bytes).map_err(|_| {
-            log::warn!("load_full_block: encode Block failed");
-            StatusCode::EncodeError
-        })?;
-
-        Ok(block_bytes)
-    }
-
-    pub fn get_full_block(
-        &self,
-        compact_block: CompactBlock,
-        proof: Vec<u8>,
-    ) -> Result<Block, StatusCode> {
         let mut body = Vec::new();
         if let Some(compact_body) = compact_block.body {
             for tx_hash in compact_body.tx_hashes {
-                let tx_bytes = self.load(1, tx_hash)?;
+                let tx_bytes = self.load(i32::from(Regions::Transactions) as u32, tx_hash)?;
                 let raw_tx = RawTransaction::decode(tx_bytes.as_slice()).map_err(|_| {
                     log::warn!("get_full_block: decode RawTransaction failed");
                     StatusCode::DecodeError
@@ -246,12 +276,25 @@ impl DB {
             }
         }
 
-        Ok(Block {
+        let proof = self.load(i32::from(Regions::Proof) as u32, height_bytes.clone())?;
+
+        let state_root = self.load(i32::from(Regions::Result) as u32, height_bytes)?;
+
+        let block = Block {
             version: compact_block.version,
             header: compact_block.header,
             body: Some(RawTransactions { body }),
             proof,
-        })
+            state_root,
+        };
+
+        let mut block_bytes = Vec::new();
+        block.encode(&mut block_bytes).map_err(|_| {
+            log::warn!("load_full_block: encode Block failed");
+            StatusCode::EncodeError
+        })?;
+
+        Ok(block_bytes)
     }
 }
 
@@ -478,7 +521,7 @@ mod tests {
                 let (height_bytes, block_bytes) = create_full_block(6000, h);
 
                 let _ = db
-                    .store_full_block(height_bytes, block_bytes)
+                    .store_all_block_data(height_bytes, block_bytes)
                     .await
                     .unwrap();
                 h = h + 1;
