@@ -1,23 +1,23 @@
 [package]
 name = "storage"
-version = "6.6.0"
+version = "6.6.2"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 license = "Apache-2.0"
 edition = "2021"
 
 [dependencies]
 log = "0.4"
-log4rs = { version = "1.0", features = ["gzip"] }
-clap = { version = "3.1", features = ["derive"] }
-tonic = "0.7"
-prost = "0.10"
-tokio = { version = "1.17", features = ["full"] }
+log4rs = { version = "1.2", features = ["gzip"] }
+clap = { version = "4.0", features = ["derive"] }
+tonic = "0.8"
+prost = "0.11"
+tokio = { version = "1.21", features = ["full"] }
 rocksdb = "0.19"
 hex = "0.4"
 serde = "1.0"
 serde_derive = "1.0"
 backtrace = "0.3"
-tower = "0.4.13"
+tower = "0.4"
 
 cloud-util = { git = "https://github.com/cita-cloud/cloud-util" }
 cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto" }
@@ -34,7 +34,7 @@ rand = "0.8"
 minitrace = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-jaeger = { git = "https://github.com/tikv/minitrace-rust.git" }
 minitrace-macro = { git = "https://github.com/tikv/minitrace-rust.git" }
-libsm = "0.5.0"
+libsm = "0.5"
 
 [profile.release.package."*"]
 # Set the default for dependencies.
@@ -43,4 +43,3 @@ debug = 0
 [profile.release]
 # Add debug info -- line tables only
 debug = 1
-
