@@ -19,9 +19,8 @@ serde_derive = "1.0"
 backtrace = "0.3"
 tower = "0.4"
 
-cloud-util = { git = "https://github.com/cita-cloud/cloud-util" }
-cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto" }
-status_code = { package = "cloud-code", git = "https://github.com/cita-cloud/status_code" }
+cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs.git" }
+cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs.git" }
 
 [[bin]]
 name = "bench"

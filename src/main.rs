@@ -65,14 +65,15 @@ fn main() {
 use crate::config::StorageConfig;
 use crate::health_check::HealthCheckServer;
 use crate::util::init_grpc_client;
+use cita_cloud_proto::common::StatusCode;
 use cita_cloud_proto::health_check::health_server::HealthServer;
+use cita_cloud_proto::status_code::StatusCodeEnum;
 use cita_cloud_proto::storage::{
     storage_service_server::StorageService, storage_service_server::StorageServiceServer, Content,
     ExtKey, Value,
 };
 use cloud_util::metrics::{run_metrics_exporter, MiddlewareLayer};
 use db::DB;
-use status_code::StatusCode;
 use std::net::AddrParseError;
 use std::path::Path;
 use std::sync::Arc;
@@ -90,10 +91,7 @@ impl StorageServer {
 
 #[tonic::async_trait]
 impl StorageService for StorageServer {
-    async fn store(
-        &self,
-        request: Request<Content>,
-    ) -> Result<Response<cita_cloud_proto::common::StatusCode>, Status> {
+    async fn store(&self, request: Request<Content>) -> Result<Response<StatusCode>, Status> {
         debug!("store request: {:?}", request);
 
         let content = request.into_inner();
@@ -103,7 +101,7 @@ impl StorageService for StorageServer {
 
         if region == 12 {
             match self.db.store_all_block_data(key, value).await {
-                Ok(()) => Ok(Response::new(StatusCode::Success.into())),
+                Ok(()) => Ok(Response::new(StatusCodeEnum::Success.into())),
                 Err(status) => {
                     warn!("store_all_block_data failed: {}", status.to_string());
                     Ok(Response::new(status.into()))
@@ -111,7 +109,7 @@ impl StorageService for StorageServer {
             }
         } else {
             match self.db.store(region, key, value) {
-                Ok(()) => Ok(Response::new(StatusCode::Success.into())),
+                Ok(()) => Ok(Response::new(StatusCodeEnum::Success.into())),
                 Err(status) => {
                     warn!("store failed: {}", status.to_string());
                     Ok(Response::new(status.into()))
@@ -130,7 +128,7 @@ impl StorageService for StorageServer {
         if region == 11 {
             match self.db.load_full_block(key) {
                 Ok(value) => Ok(Response::new(Value {
-                    status: Some(StatusCode::Success.into()),
+                    status: Some(StatusCodeEnum::Success.into()),
                     value,
                 })),
                 Err(status) => {
@@ -144,7 +142,7 @@ impl StorageService for StorageServer {
         } else {
             match self.db.load(region, key) {
                 Ok(value) => Ok(Response::new(Value {
-                    status: Some(StatusCode::Success.into()),
+                    status: Some(StatusCodeEnum::Success.into()),
                     value,
                 })),
                 Err(status) => {
@@ -158,10 +156,7 @@ impl StorageService for StorageServer {
         }
     }
 
-    async fn delete(
-        &self,
-        request: Request<ExtKey>,
-    ) -> Result<Response<cita_cloud_proto::common::StatusCode>, Status> {
+    async fn delete(&self, request: Request<ExtKey>) -> Result<Response<StatusCode>, Status> {
         debug!("delete request: {:?}", request);
 
         let ext_key = request.into_inner();
@@ -169,7 +164,7 @@ impl StorageService for StorageServer {
         let key = ext_key.key;
 
         match self.db.delete(region, key) {
-            Ok(()) => Ok(Response::new(StatusCode::Success.into())),
+            Ok(()) => Ok(Response::new(StatusCodeEnum::Success.into())),
             Err(status) => {
                 warn!("delete error: {}", status.to_string());
                 Ok(Response::new(status.into()))
@@ -179,7 +174,7 @@ impl StorageService for StorageServer {
 }
 
 #[tokio::main]
-async fn run(opts: RunOpts) -> Result<(), StatusCode> {
+async fn run(opts: RunOpts) -> Result<(), StatusCodeEnum> {
     tokio::spawn(cloud_util::signal::handle_signals());
 
     let config = StorageConfig::new(&opts.config_path);
@@ -201,7 +196,7 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
     let addr_str = format!("127.0.0.1:{}", config.storage_port);
     let addr = addr_str.parse().map_err(|e: AddrParseError| {
         warn!("grpc listen addr parse failed: {} ", e);
-        StatusCode::FatalError
+        StatusCodeEnum::FatalError
     })?;
 
     // init db
@@ -236,7 +231,7 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
                     "start storage_rocksdb grpc server failed: {} ",
                     e.to_string()
                 );
-                StatusCode::FatalError
+                StatusCodeEnum::FatalError
             })?;
     } else {
         info!("metrics off");
@@ -250,7 +245,7 @@ async fn run(opts: RunOpts) -> Result<(), StatusCode> {
                     "start storage_rocksdb grpc server failed: {} ",
                     e.to_string()
                 );
-                StatusCode::FatalError
+                StatusCodeEnum::FatalError
             })?;
     }
 

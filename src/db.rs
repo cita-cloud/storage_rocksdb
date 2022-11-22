@@ -14,6 +14,7 @@
 
 use crate::config::StorageConfig;
 use crate::util::{check_key, check_region, check_value, crypto_client, full_to_compact};
+use cita_cloud_proto::status_code::StatusCodeEnum;
 use cita_cloud_proto::{
     blockchain::{Block, CompactBlock, RawTransaction, RawTransactions},
     storage::Regions,
@@ -23,7 +24,6 @@ use cloud_util::crypto::get_block_hash;
 use prost::Message;
 use rocksdb::{BlockBasedOptions, DB as RocksDB};
 use rocksdb::{ColumnFamilyDescriptor, Options};
-use status_code::StatusCode;
 use std::path::Path;
 use std::vec::Vec;
 
@@ -60,17 +60,17 @@ impl DB {
         DB { db }
     }
 
-    pub fn store(&self, region: u32, key: Vec<u8>, value: Vec<u8>) -> Result<(), StatusCode> {
+    pub fn store(&self, region: u32, key: Vec<u8>, value: Vec<u8>) -> Result<(), StatusCodeEnum> {
         if !check_region(region) {
-            return Err(StatusCode::InvalidRegion);
+            return Err(StatusCodeEnum::InvalidRegion);
         }
 
         if !check_key(region, &key) {
-            return Err(StatusCode::InvalidKey);
+            return Err(StatusCodeEnum::InvalidKey);
         }
 
         if !check_value(region, &value) {
-            return Err(StatusCode::InvalidValue);
+            return Err(StatusCodeEnum::InvalidValue);
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
@@ -81,21 +81,21 @@ impl DB {
                     hex::encode(&key),
                     e
                 );
-                StatusCode::StoreError
+                StatusCodeEnum::StoreError
             })
         } else {
             log::warn!("store: bad region({})", region);
-            Err(StatusCode::BadRegion)
+            Err(StatusCodeEnum::BadRegion)
         }
     }
 
-    pub fn load(&self, region: u32, key: Vec<u8>) -> Result<Vec<u8>, StatusCode> {
+    pub fn load(&self, region: u32, key: Vec<u8>) -> Result<Vec<u8>, StatusCodeEnum> {
         if !check_region(region) {
-            return Err(StatusCode::InvalidRegion);
+            return Err(StatusCodeEnum::InvalidRegion);
         }
 
         if !check_key(region, &key) {
-            return Err(StatusCode::InvalidKey);
+            return Err(StatusCodeEnum::InvalidKey);
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
@@ -107,7 +107,7 @@ impl DB {
                         region,
                         hex::encode(&key)
                     );
-                    Err(StatusCode::NotFound)
+                    Err(StatusCodeEnum::NotFound)
                 }
                 Err(e) => {
                     log::warn!(
@@ -116,22 +116,22 @@ impl DB {
                         hex::encode(&key),
                         e
                     );
-                    Err(StatusCode::LoadError)
+                    Err(StatusCodeEnum::LoadError)
                 }
             }
         } else {
             log::warn!("load: bad region({})", region);
-            Err(StatusCode::BadRegion)
+            Err(StatusCodeEnum::BadRegion)
         }
     }
 
-    pub fn delete(&self, region: u32, key: Vec<u8>) -> Result<(), StatusCode> {
+    pub fn delete(&self, region: u32, key: Vec<u8>) -> Result<(), StatusCodeEnum> {
         if !check_region(region) {
-            return Err(StatusCode::InvalidRegion);
+            return Err(StatusCodeEnum::InvalidRegion);
         }
 
         if !check_key(region, &key) {
-            return Err(StatusCode::InvalidKey);
+            return Err(StatusCodeEnum::InvalidKey);
         }
 
         if let Some(cf) = self.db.cf_handle(&format!("{}", region)) {
@@ -142,11 +142,11 @@ impl DB {
                     hex::encode(&key),
                     e
                 );
-                StatusCode::DeleteError
+                StatusCodeEnum::DeleteError
             })
         } else {
             log::warn!("delete: bad region({})", region);
-            Err(StatusCode::BadRegion)
+            Err(StatusCodeEnum::BadRegion)
         }
     }
 
@@ -154,19 +154,19 @@ impl DB {
         &self,
         height_bytes: Vec<u8>,
         block_bytes: Vec<u8>,
-    ) -> Result<(), StatusCode> {
+    ) -> Result<(), StatusCodeEnum> {
         let mut height_array = [0; 8];
         height_array.copy_from_slice(&height_bytes);
         let height = u64::from_be_bytes(height_array);
         log::info!("store_all_block_data: height({}) start", height);
 
         if !check_key(11, &height_bytes) {
-            return Err(StatusCode::InvalidKey);
+            return Err(StatusCodeEnum::InvalidKey);
         }
 
         let block = Block::decode(block_bytes.as_slice()).map_err(|_| {
             log::warn!("store_all_block_data: decode Block failed");
-            StatusCode::DecodeError
+            StatusCodeEnum::DecodeError
         })?;
 
         let block_hash = get_block_hash(crypto_client(), block.header.as_ref()).await?;
@@ -174,7 +174,7 @@ impl DB {
         for (tx_index, raw_tx) in block
             .body
             .clone()
-            .ok_or(StatusCode::NoneBlockBody)?
+            .ok_or(StatusCodeEnum::NoneBlockBody)?
             .body
             .into_iter()
             .enumerate()
@@ -182,7 +182,7 @@ impl DB {
             let mut tx_bytes = Vec::new();
             raw_tx.encode(&mut tx_bytes).map_err(|_| {
                 log::warn!("store_all_block_data: encode RawTransaction failed");
-                StatusCode::EncodeError
+                StatusCodeEnum::EncodeError
             })?;
 
             let tx_hash = get_tx_hash(&raw_tx)?.to_vec();
@@ -240,7 +240,7 @@ impl DB {
             .encode(&mut compact_block_bytes)
             .map_err(|_| {
                 log::warn!("store_all_block_data: encode CompactBlock failed");
-                StatusCode::EncodeError
+                StatusCodeEnum::EncodeError
             })?;
         self.store(
             i32::from(Regions::CompactBlock) as u32,
@@ -253,7 +253,7 @@ impl DB {
         Ok(())
     }
 
-    pub fn load_full_block(&self, height_bytes: Vec<u8>) -> Result<Vec<u8>, StatusCode> {
+    pub fn load_full_block(&self, height_bytes: Vec<u8>) -> Result<Vec<u8>, StatusCodeEnum> {
         // get compact_block
         let compact_block_bytes = self.load(
             i32::from(Regions::CompactBlock) as u32,
@@ -261,7 +261,7 @@ impl DB {
         )?;
         let compact_block = CompactBlock::decode(compact_block_bytes.as_slice()).map_err(|_| {
             log::warn!("load_full_block: decode CompactBlock failed");
-            StatusCode::EncodeError
+            StatusCodeEnum::EncodeError
         })?;
 
         let mut body = Vec::new();
@@ -270,7 +270,7 @@ impl DB {
                 let tx_bytes = self.load(i32::from(Regions::Transactions) as u32, tx_hash)?;
                 let raw_tx = RawTransaction::decode(tx_bytes.as_slice()).map_err(|_| {
                     log::warn!("get_full_block: decode RawTransaction failed");
-                    StatusCode::DecodeError
+                    StatusCodeEnum::DecodeError
                 })?;
                 body.push(raw_tx)
             }
@@ -291,7 +291,7 @@ impl DB {
         let mut block_bytes = Vec::new();
         block.encode(&mut block_bytes).map_err(|_| {
             log::warn!("load_full_block: encode Block failed");
-            StatusCode::EncodeError
+            StatusCodeEnum::EncodeError
         })?;
 
         Ok(block_bytes)
