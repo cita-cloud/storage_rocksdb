@@ -15,3 +15,6 @@
 pub mod config;
 pub mod db;
 mod util;
+
+#[macro_use]
+extern crate tracing;

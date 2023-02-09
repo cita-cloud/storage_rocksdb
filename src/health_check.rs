@@ -40,6 +40,8 @@ impl Health for HealthCheckServer {
         &self,
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<HealthCheckResponse>, Status> {
+        info!("healthcheck entry!");
+
         let store_ret = self.db.store(
             i32::from(Regions::Global) as u32,
             u64::MAX.to_be_bytes().to_vec(),
