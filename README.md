@@ -11,20 +11,17 @@ docker build -t citacloud/storage_rocksdb .
 
 ```
 $ storage -h
-storage 6.6.0
-Rivtower Technologies <contact@rivtower.com>
-network service
+storage service
 
-USAGE:
-    storage <SUBCOMMAND>
+Usage: storage <COMMAND>
 
-OPTIONS:
-    -h, --help       Print help information
-    -V, --version    Print version information
+Commands:
+  run   run this service
+  help  Print this message or the help of the given subcommand(s)
 
-SUBCOMMANDS:
-    help    Print this message or the help of the given subcommand(s)
-    run     run this service
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 
 ### storage-run
@@ -33,16 +30,13 @@ SUBCOMMANDS:
 
 ```
 $ storage run -h
-storage-run
 run this service
 
-USAGE:
-    storage run [OPTIONS]
+Usage: storage run [OPTIONS]
 
-OPTIONS:
-    -c, --config <CONFIG_PATH>    Chain config path [default: config.toml]
-    -h, --help                    Print help information
-    -l, --log <LOG_FILE>          log config path [default: storage-log4rs.yaml]
+Options:
+  -c, --config <CONFIG_PATH>  Chain config path [default: config.toml]
+  -h, --help                  Print help
 ```
 
 参数：
@@ -50,25 +44,25 @@ OPTIONS:
 
     参见示例`example/config.toml`。
 
-    其中：
+    其中`[storage_rocksdb]`段为微服务的配置：
     * `crypto_port` 为依赖的`Crypto`微服务的`gRPC`服务监听的端口号。
     * `storage_port` 为本微服务的`gRPC`服务监听的端口号。
     * `write_buffer_size` 设置`rocksdb`的写缓存大小，单位为字节。
     * `max_open_file` 设置`rocksdb`最大打开文件数量。
-2. 日志配置文件。
+    * `domain` 节点的域名
 
-    参见示例`storage-log4rs.yaml`。
-
-    其中：
-
-    * `level` 为日志等级。可选项有：`Error`，`Warn`，`Info`，`Debug`，`Trace`，默认为`Info`。
-    * `appenders` 为输出选项，类型为一个数组。可选项有：标准输出(`stdout`)和滚动的日志文件（`journey-service`），默认为同时输出到两个地方。
-
+    其中`[storage_rocksdb.log_config]`段为微服务日志的配置：
+    * `max_level` 日志等级
+    * `filter` 日志过滤配置
+    * `service_name` 服务名称，用作日志文件名与日志采集的服务名称
+    * `rolling_file_path` 日志文件路径
+    * `agent_endpoint` jaeger 采集端地址
 
 ```
-$ storage run -c example/config.toml -l storage-log4rs.yaml
-2022-03-14T06:13:17.772131713+00:00 INFO storage - grpc port of this service: 60003
-2022-03-14T06:13:17.772278777+00:00 INFO storage - db path of this service: chain_data
+$ storage run -c example/config.toml
+2023-02-09T02:22:10.237028Z  INFO storage: grpc port of storage_rocksdb: 60003
+2023-02-09T02:22:10.237141Z  INFO storage: db path of this service: chain_data
+2023-02-09T02:22:10.534378Z  INFO storage: start storage_rocksdb grpc server
 ```
 
 ## 设计

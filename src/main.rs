@@ -18,11 +18,13 @@ mod health_check;
 mod panic_hook;
 mod util;
 
+#[macro_use]
+extern crate tracing;
+
 use crate::panic_hook::set_panic_handler;
 use clap::Parser;
-use log::{debug, info, warn};
 
-/// network service
+/// storage service
 #[derive(Parser)]
 #[clap(version, author)]
 struct Opts {
@@ -43,9 +45,6 @@ struct RunOpts {
     /// Chain config path
     #[clap(short = 'c', long = "config", default_value = "config.toml")]
     config_path: String,
-    /// log config path
-    #[clap(short = 'l', long = "log", default_value = "storage-log4rs.yaml")]
-    log_file: String,
 }
 
 fn main() {
@@ -91,7 +90,9 @@ impl StorageServer {
 
 #[tonic::async_trait]
 impl StorageService for StorageServer {
+    #[instrument(skip_all)]
     async fn store(&self, request: Request<Content>) -> Result<Response<StatusCode>, Status> {
+        cloud_util::tracer::set_parent(&request);
         debug!("store request: {:?}", request);
 
         let content = request.into_inner();
@@ -118,7 +119,9 @@ impl StorageService for StorageServer {
         }
     }
 
+    #[instrument(skip_all)]
     async fn load(&self, request: Request<ExtKey>) -> Result<Response<Value>, Status> {
+        cloud_util::tracer::set_parent(&request);
         debug!("load request: {:?}", request);
 
         let ext_key = request.into_inner();
@@ -156,7 +159,9 @@ impl StorageService for StorageServer {
         }
     }
 
+    #[instrument(skip_all)]
     async fn delete(&self, request: Request<ExtKey>) -> Result<Response<StatusCode>, Status> {
+        cloud_util::tracer::set_parent(&request);
         debug!("delete request: {:?}", request);
 
         let ext_key = request.into_inner();
@@ -179,9 +184,10 @@ async fn run(opts: RunOpts) -> Result<(), StatusCodeEnum> {
 
     let config = StorageConfig::new(&opts.config_path);
     init_grpc_client(&config);
-    // init log4rs
-    log4rs::init_file(&opts.log_file, Default::default())
-        .map_err(|e| println!("log init err: {}", e))
+
+    // init tracer
+    cloud_util::tracer::init_tracer(config.domain.clone(), &config.log_config)
+        .map_err(|e| println!("tracer init err: {e}"))
         .unwrap();
 
     info!("grpc port of storage_rocksdb: {}", &config.storage_port);

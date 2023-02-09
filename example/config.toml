@@ -3,3 +3,11 @@ crypto_port = 60005
 storage_port = 60003
 write_buffer_size = 65536
 max_open_file = 65535
+domain = "test-chain-node1"
+
+[storage_rocksdb.log_config]
+max_level = "info"
+filter = "info"
+# rolling_file_path = "./logs"
+service_name = "storage"
+# agent_endpoint = "127.0.0.1:6831"

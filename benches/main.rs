@@ -10,7 +10,7 @@ pub async fn store_data(
     key: Vec<u8>,
     value: Vec<u8>,
 ) -> Result<bool, Box<dyn std::error::Error>> {
-    let storage_addr = format!("http://127.0.0.1:{}", storage_port);
+    let storage_addr = format!("http://127.0.0.1:{storage_port}");
     let mut client = StorageServiceClient::connect(storage_addr).await?;
 
     let request = Request::new(Content { region, key, value });
