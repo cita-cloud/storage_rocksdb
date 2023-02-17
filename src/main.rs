@@ -22,11 +22,11 @@ mod util;
 extern crate tracing;
 
 use crate::panic_hook::set_panic_handler;
+use crate::util::clap_about;
 use clap::Parser;
 
-/// storage service
 #[derive(Parser)]
-#[clap(version, author)]
+#[clap(version, about = clap_about())]
 struct Opts {
     #[clap(subcommand)]
     subcmd: SubCommand,

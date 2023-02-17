@@ -11,7 +11,8 @@ docker build -t citacloud/storage_rocksdb .
 
 ```
 $ storage -h
-storage service
+storage 6.6.3
+Rivtower Technologies <contact@rivtower.com>
 
 Usage: storage <COMMAND>
 
