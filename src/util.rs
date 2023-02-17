@@ -88,3 +88,10 @@ pub fn full_to_compact(block: Block) -> CompactBlock {
         body: Some(compact_body),
     }
 }
+
+pub fn clap_about() -> String {
+    let name = env!("CARGO_PKG_NAME").to_string();
+    let version = env!("CARGO_PKG_VERSION");
+    let authors = env!("CARGO_PKG_AUTHORS");
+    name + " " + version + "\n" + authors
+}
