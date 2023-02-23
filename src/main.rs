@@ -55,6 +55,13 @@ fn main() {
 
     match opts.subcmd {
         SubCommand::Run(opts) => {
+            let config = StorageConfig::new(&opts.config_path);
+
+            // init tracer
+            cloud_util::tracer::init_tracer(config.domain, &config.log_config)
+                .map_err(|e| println!("tracer init err: {e}"))
+                .unwrap();
+
             let fin = run(opts);
             warn!("Should not reach here {:?}", fin);
         }
@@ -184,11 +191,6 @@ async fn run(opts: RunOpts) -> Result<(), StatusCodeEnum> {
 
     let config = StorageConfig::new(&opts.config_path);
     init_grpc_client(&config);
-
-    // init tracer
-    cloud_util::tracer::init_tracer(config.domain.clone(), &config.log_config)
-        .map_err(|e| println!("tracer init err: {e}"))
-        .unwrap();
 
     info!("grpc port of storage_rocksdb: {}", &config.storage_port);
 
