@@ -202,17 +202,6 @@ impl DB {
                 tx_index.to_be_bytes().to_vec(),
             )?;
         }
-
-        self.store(
-            i32::from(Regions::Global) as u32,
-            0u64.to_be_bytes().to_vec(),
-            height_bytes.clone(),
-        )?;
-        self.store(
-            i32::from(Regions::Global) as u32,
-            1u64.to_be_bytes().to_vec(),
-            block_hash.clone(),
-        )?;
         self.store(
             i32::from(Regions::BlockHash) as u32,
             height_bytes.clone(),
@@ -244,10 +233,14 @@ impl DB {
             })?;
         self.store(
             i32::from(Regions::CompactBlock) as u32,
-            height_bytes,
+            height_bytes.clone(),
             compact_block_bytes,
         )?;
-
+        self.store(
+            i32::from(Regions::Global) as u32,
+            0u64.to_be_bytes().to_vec(),
+            height_bytes,
+        )?;
         info!("store_all_block_data: height({}) finish", height);
 
         Ok(())
