@@ -15,15 +15,14 @@
 mod config;
 mod db;
 mod health_check;
-mod panic_hook;
 mod util;
 
 #[macro_use]
 extern crate tracing;
 
-use crate::panic_hook::set_panic_handler;
 use crate::util::clap_about;
 use clap::Parser;
+use cloud_util::panic_hook::set_panic_handler;
 
 #[derive(Parser)]
 #[clap(version, about = clap_about())]
