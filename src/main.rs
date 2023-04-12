@@ -255,10 +255,7 @@ async fn run(opts: RunOpts) -> Result<(), StatusCodeEnum> {
             .serve(addr)
             .await
             .map_err(|e| {
-                warn!(
-                    "start storage_rocksdb grpc server failed: {} ",
-                    e.to_string()
-                );
+                warn!("start storage_rocksdb grpc server failed: {:?}", e);
                 StatusCodeEnum::FatalError
             })?;
     } else {
@@ -269,10 +266,7 @@ async fn run(opts: RunOpts) -> Result<(), StatusCodeEnum> {
             .serve(addr)
             .await
             .map_err(|e| {
-                warn!(
-                    "start storage_rocksdb grpc server failed: {} ",
-                    e.to_string()
-                );
+                warn!("start storage_rocksdb grpc server failed: {:?}", e);
                 StatusCodeEnum::FatalError
             })?;
     }
