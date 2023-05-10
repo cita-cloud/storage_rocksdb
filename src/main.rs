@@ -62,7 +62,6 @@ fn main() {
 
 use crate::config::StorageConfig;
 use crate::health_check::HealthCheckServer;
-use crate::util::init_grpc_client;
 use cita_cloud_proto::common::StatusCode;
 use cita_cloud_proto::health_check::health_server::HealthServer;
 use cita_cloud_proto::status_code::StatusCodeEnum;
@@ -205,7 +204,6 @@ async fn run(opts: RunOpts) -> Result<(), StatusCodeEnum> {
     tokio::spawn(cloud_util::signal::handle_signals());
 
     let config = StorageConfig::new(&opts.config_path);
-    init_grpc_client(&config);
 
     // init tracer
     cloud_util::tracer::init_tracer(config.domain.clone(), &config.log_config)
