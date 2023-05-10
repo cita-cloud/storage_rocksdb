@@ -13,14 +13,13 @@
 // limitations under the License.
 
 use crate::config::StorageConfig;
-use crate::util::{check_key, check_region, check_value, crypto_client, full_to_compact};
+use crate::util::{check_key, check_region, check_value, full_to_compact};
 use cita_cloud_proto::status_code::StatusCodeEnum;
 use cita_cloud_proto::{
     blockchain::{Block, CompactBlock, RawTransaction, RawTransactions},
     storage::Regions,
 };
 use cloud_util::common::get_tx_hash;
-use cloud_util::crypto::get_block_hash;
 use prost::Message;
 use rocksdb::{BlockBasedOptions, DB as RocksDB};
 use rocksdb::{ColumnFamilyDescriptor, Options};
@@ -164,12 +163,12 @@ impl DB {
             return Err(StatusCodeEnum::InvalidKey);
         }
 
-        let block = Block::decode(block_bytes.as_slice()).map_err(|_| {
+        let block_hash = block_bytes[..32].to_vec();
+
+        let block = Block::decode(&block_bytes[32..]).map_err(|_| {
             warn!("store_all_block_data: decode Block failed");
             StatusCodeEnum::DecodeError
         })?;
-
-        let block_hash = get_block_hash(crypto_client(), block.header.as_ref()).await?;
 
         for (tx_index, raw_tx) in block
             .body
@@ -469,7 +468,8 @@ mod tests {
 
         let block_bytes = {
             let mut buf = Vec::new();
-            block.encode(&mut buf).unwrap();
+            buf.extend_from_slice(&vec![0u8; 32]);
+            block.encode(&mut buf[32..]).unwrap();
             buf
         };
 
